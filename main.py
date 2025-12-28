@@ -34,6 +34,8 @@ class Expr:
             return self.left.eval() + self.right.eval()
 
         if self.type == '-':
+            if self.left is None:
+                return -self.right.eval()
             return self.left.eval() - self.right.eval()
 
         if self.type == '*':
@@ -131,6 +133,11 @@ def parse_atom(tokens):
 
 
 def parse_factor(tokens):
+    if tokens[0].type == '-':
+        tokens = tokens[1:]
+        right, tokens = parse_factor(tokens)
+        return Expr('-', None, right), tokens
+
     left, tokens = parse_atom(tokens)
 
     while len(tokens) > 0 and tokens[0].type == '^':
@@ -168,11 +175,15 @@ def parse_expr(tokens):
 
 
 def parse(tokens):
-    # expr = sum
-    # sum = term, { '+' | '-', term }
-    # term = factor, { '*' | '/', factor }
-    # factor = atom, { '^', atom }
-    # atom = ( '(', expr, ')' ) | 'number'
+    # expr: sum
+    # sum: term, { '+' | '-', term }
+    # term: factor, { '*' | '/', factor }
+    # factor =
+    #   | '-', factor
+    #   | atom, { '^', atom }
+    # atom:
+    #   | '(', expr, ')'
+    #   | 'number'
 
     root, tokens = parse_expr(tokens)
 
