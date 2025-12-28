@@ -73,10 +73,12 @@ def tok_number(s):
 
 
 def tok_binop(s):
-    assert re.match('[-+*/^%]', s[0])
-    token, s = s[0], s[1:]
+    t, s = s[0], s[1:]
 
-    return Token(token, None), s
+    if not re.match('[-+*/^%]', t):
+        raise TokenError(f"unexpected token: {t}")
+
+    return Token(t, None), s
 
 
 def tok_paren(s):
