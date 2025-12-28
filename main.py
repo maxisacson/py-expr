@@ -47,6 +47,9 @@ class Expr:
         if self.type == '^':
             return self.left.eval() ** self.right.eval()
 
+        if self.type == '%':
+            return self.left.eval() % self.right.eval()
+
     def __repr__(self):
         return f"Expr({self.type}, {self.left}, {self.right})"
 
@@ -70,7 +73,7 @@ def tok_number(s):
 
 
 def tok_binop(s):
-    assert re.match('[-+*/^]', s[0])
+    assert re.match('[-+*/^%]', s[0])
     token, s = s[0], s[1:]
 
     return Token(token, None), s
@@ -98,7 +101,7 @@ def tokenize(s):
             tokens.append(token)
             continue
 
-        if re.match('[-+*/^]', s[0]):
+        if re.match('[-+*/^%]', s[0]):
             token, s = tok_binop(s)
             tokens.append(token)
             continue
@@ -151,7 +154,7 @@ def parse_factor(tokens):
 def parse_term(tokens):
     left, tokens = parse_factor(tokens)
 
-    while len(tokens) > 0 and tokens[0].type in ['*', '/']:
+    while len(tokens) > 0 and tokens[0].type in ['*', '/', '%']:
         type, tokens = tokens[0].type, tokens[1:]
         right, tokens = parse_factor(tokens)
         left = Expr(type, left, right)
@@ -177,8 +180,8 @@ def parse_expr(tokens):
 def parse(tokens):
     # expr: sum
     # sum: term, { '+' | '-', term }
-    # term: factor, { '*' | '/', factor }
-    # factor =
+    # term: factor, { '*' | '/' | '%', factor }
+    # factor:
     #   | '-', factor
     #   | atom, { '^', atom }
     # atom:
@@ -222,7 +225,6 @@ def draw_tree(root):
 
 def parse_expression(s):
     tokens = tokenize(s)
-    print(tokens)
     expr = parse(tokens)
     return expr
 
