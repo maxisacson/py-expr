@@ -236,16 +236,16 @@ def parse_atom(tokens):
 
 
 def parse_factor(tokens):
-    if tokens[0].type == '-':
+    if peek(tokens).type == '-':
         tokens = tokens[1:]
         right, tokens = parse_factor(tokens)
         return Expr('-', None, right), tokens
 
     left, tokens = parse_atom(tokens)
 
-    while len(tokens) > 0 and tokens[0].type == '^':
+    if peek(tokens).type == '^':
         type, tokens = tokens[0].type, tokens[1:]
-        right, tokens = parse_atom(tokens)
+        right, tokens = parse_factor(tokens)
         left = Expr(type, left, right)
 
     return left, tokens
@@ -283,10 +283,12 @@ def parse(tokens):
     # term: factor, { '*' | '/' | '%', factor }
     # factor:
     #   | '-', factor
-    #   | atom, { '^', atom }
+    #   | atom, [ '^', factor ]
     # atom:
+    #   | 'identifier', [ '(', params?, ')' ]
     #   | '(', expr, ')'
     #   | 'number'
+    # params: expr, { ',', expr }
 
     root, tokens = parse_expr(tokens)
 
