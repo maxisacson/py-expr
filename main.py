@@ -86,6 +86,13 @@ class Expr:
 
             return value
 
+        if self.type == 'assign':
+            vname = self.left
+            value = self.right.eval()
+            GLOBALS[vname] = value
+
+            return value
+
     def __repr__(self):
         return f"Expr({self.type}, {self.left}, {self.right})"
 
@@ -159,6 +166,15 @@ def tok_comma(s):
     return Token(t, None), s
 
 
+def tok_equal(s):
+    t, s = s[0], s[1:]
+
+    if t != '=':
+        raise TokenError(f"unexpected token: {t}")
+
+    return Token(t, None), s
+
+
 def tokenize(s):
     tokens = []
 
@@ -192,14 +208,19 @@ def tokenize(s):
             tokens.append(token)
             continue
 
+        if s[0] == '=':
+            token, s = tok_equal(s)
+            tokens.append(token)
+            continue
+
         raise TokenError(f"unexpected token: {s[0]}")
 
     return tokens
 
 
-def peek(tokens):
-    if len(tokens) > 0:
-        return tokens[0]
+def peek(tokens, offset=0):
+    if len(tokens) > offset:
+        return tokens[offset]
 
     return Token(None, None)
 
@@ -280,7 +301,7 @@ def parse_term(tokens):
     return left, tokens
 
 
-def parse_sum(tokens):
+def parse_expr(tokens):
     left, tokens = parse_term(tokens)
 
     while len(tokens) > 0 and tokens[0].type in ['+', '-']:
@@ -291,13 +312,33 @@ def parse_sum(tokens):
     return left, tokens
 
 
-def parse_expr(tokens):
-    return parse_sum(tokens)
+def parse_asgn(tokens):
+    ident = tokens.pop(0)
+    if ident.type != 'identifier':
+        raise ParseError(f"unexpected token: {ident.type}")
+
+    t = tokens.pop(0)
+    if t.type != '=':
+        raise ParseError(f"unexpected token: {t.type}")
+
+    expr, tokens = parse_expr(tokens)
+
+    return Expr('assign', ident.value, expr), tokens
+
+
+def parse_stmnt(tokens):
+    if peek(tokens).type == 'identifier' and peek(tokens, 1).type == '=':
+        root, tokens = parse_asgn(tokens)
+    else:
+        root, tokens = parse_expr(tokens)
+
+    return root, tokens
 
 
 def parse(tokens):
-    # expr: sum
-    # sum: term, { '+' | '-', term }
+    # stmnt: asgn | expr
+    # asgn: 'identifier', '=', expr
+    # expr: term, { '+' | '-', term }
     # term: factor, { '*' | '/' | '%', factor }
     # factor:
     #   | '-', factor
@@ -308,7 +349,7 @@ def parse(tokens):
     #   | 'number'
     # params: expr, { ',', expr }
 
-    root, tokens = parse_expr(tokens)
+    root, tokens = parse_stmnt(tokens)
 
     if len(tokens) != 0:
         raise ParseError("unexpected tokens")
@@ -362,12 +403,24 @@ def main(argv):
     if len(argv) < 2:
         exit(1)
 
-    expr = parse_expression(argv[1])
-    draw_tree(expr)
-    result = expr.eval()
+    assignments = []
+    expressions = []
 
-    print(f"expr: {argv[1]}")
-    print(f"result: {result}")
+    for e in argv[1:]:
+        expr = parse_expression(e)
+        if expr.type == 'assign':
+            assignments.append(expr)
+        else:
+            expressions.append(expr)
+
+    for expr in assignments:
+        expr.eval()
+
+    for expr in expressions:
+        draw_tree(expr)
+        result = expr.eval()
+
+    print(result)
 
 
 if __name__ == "__main__":
