@@ -14,6 +14,10 @@ class ParseError(RuntimeError):
     pass
 
 
+class EvalError(RuntimeError):
+    pass
+
+
 GLOBALS = {
     'sin': math.sin,
     'cos': math.cos,
@@ -42,30 +46,30 @@ class Expr:
         if self.type is None:
             return self.left.eval(context)
 
-        if self.type == 'literal':
+        elif self.type == 'literal':
             return self.left
 
-        if self.type == '+':
+        elif self.type == '+':
             return self.left.eval(context) + self.right.eval(context)
 
-        if self.type == '-':
+        elif self.type == '-':
             if self.left is None:
                 return -self.right.eval(context)
             return self.left.eval(context) - self.right.eval(context)
 
-        if self.type == '*':
+        elif self.type == '*':
             return self.left.eval(context) * self.right.eval(context)
 
-        if self.type == '/':
+        elif self.type == '/':
             return self.left.eval(context) / self.right.eval(context)
 
-        if self.type == '^':
+        elif self.type == '^':
             return self.left.eval(context) ** self.right.eval(context)
 
-        if self.type == '%':
+        elif self.type == '%':
             return self.left.eval(context) % self.right.eval(context)
 
-        if self.type == 'fcall':
+        elif self.type == 'fcall':
             fname = self.left
             params = self.right
 
@@ -76,7 +80,7 @@ class Expr:
 
             return func(*(p.eval() for p in params))
 
-        if self.type == 'var':
+        elif self.type == 'var':
             vname = self.left
 
             if vname in context:
@@ -86,12 +90,26 @@ class Expr:
 
             return value
 
-        if self.type == '=':
+        elif self.type == '=':
             vname = self.left.left
             value = self.right.eval()
             GLOBALS[vname] = value
 
             return value
+
+        elif self.type == ":=":
+            fname = self.left.left
+            param_list = self.left.right
+            body = self.right
+
+            def f(*args):
+                return body.eval({k:v for k,v in zip(param_list, args)})
+
+            GLOBALS[fname] = f
+
+            return None
+
+        raise EvalError(f"unknown expression type: {self.type}")
 
     def __repr__(self):
         return f"Expr({self.type}, {self.left}, {self.right})"
@@ -156,7 +174,7 @@ def tokenize(s):
             s = s[1:]
             continue
 
-        if re.match(r'[-+*/^%,=\(\)]', s[0]):
+        if re.match(r'[-+*/^%,=\(\):]', s[0]):
             t, s = s[0], s[1:]
             tokens.append(Token(t, None))
             continue
@@ -197,6 +215,22 @@ def parse_params(tokens):
     return params, tokens
 
 
+def parse_param_list(tokens):
+    param_list = []
+
+    while True:
+        p = tokens.pop(0)
+        if p.type != 'identifier':
+            raise ParseError(f"unexpected token {p.type}")
+        param_list.append(p.value)
+        if peek(tokens).type == ',':
+            tokens.pop(0)
+        else:
+            break
+
+    return param_list, tokens
+
+
 def parse_atom(tokens):
     next = tokens.pop(0)
 
@@ -205,7 +239,7 @@ def parse_atom(tokens):
             return Expr('var', next.value), tokens
 
         tokens.pop(0)
-        if peek(tokens) == ')':
+        if peek(tokens).type == ')':
             tokens.pop(0)
             return Expr('fcall', next.value, []), tokens
 
@@ -275,18 +309,35 @@ def parse_assign(tokens):
     if ident.type != 'identifier':
         raise ParseError(f"unexpected token: {ident.type}")
 
+    left = Expr('var', ident.value)
+
+    t = tokens.pop(0)
+    if t.type == '=':
+        expr, tokens = parse_expr(tokens)
+
+        return Expr('=', left, expr), tokens
+
+    if t.type != ':':
+        raise ParseError(f"unexpected token: {t.type}")
+
+    if peek(tokens).type == '=':
+        param_list = []
+    else:
+        param_list, tokens = parse_param_list(tokens)
+
+    left.right = param_list
+
     t = tokens.pop(0)
     if t.type != '=':
         raise ParseError(f"unexpected token: {t.type}")
 
-    left = Expr('var', ident.value)
     expr, tokens = parse_expr(tokens)
 
-    return Expr('=', left, expr), tokens
+    return Expr(':=', left, expr), tokens
 
 
 def parse_stmnt(tokens):
-    if peek(tokens).type == 'identifier' and peek(tokens, 1).type == '=':
+    if peek(tokens).type == 'identifier' and peek(tokens, 1).type in ['=', ':']:
         root, tokens = parse_assign(tokens)
     else:
         root, tokens = parse_expr(tokens)
@@ -296,7 +347,10 @@ def parse_stmnt(tokens):
 
 def parse(tokens):
     # stmnt: asgn | expr
-    # asgn: 'identifier', '=', expr
+    # asgn:
+    #   | 'identifier', '=', expr
+    #   | 'identifier', ':', param_list?, '=', expr
+    # param_list: 'identifier', { ',', identifier }
     # expr: term, { '+' | '-', term }
     # term: factor, { '*' | '/' | '%', factor }
     # factor:
