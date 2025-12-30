@@ -125,15 +125,6 @@ def tok_number(s):
     return Token('number', type(token)), s
 
 
-def tok_binop(s):
-    t, s = s[0], s[1:]
-
-    if not re.match('[-+*/^%]', t):
-        raise TokenError(f"unexpected token: {t}")
-
-    return Token(t, None), s
-
-
 def tok_paren(s):
     t, s = s[0], s[1:]
 
@@ -157,30 +148,17 @@ def tok_ident(s):
     return Token('identifier', token), s
 
 
-def tok_comma(s):
-    t, s = s[0], s[1:]
-
-    if t != ',':
-        raise TokenError(f"unexpected token: {t}")
-
-    return Token(t, None), s
-
-
-def tok_equal(s):
-    t, s = s[0], s[1:]
-
-    if t != '=':
-        raise TokenError(f"unexpected token: {t}")
-
-    return Token(t, None), s
-
-
 def tokenize(s):
     tokens = []
 
     while len(s) > 0:
         if re.match(r'\s', s[0]):
             s = s[1:]
+            continue
+
+        if re.match(r'[-+*/^%,=\(\)]', s[0]):
+            t, s = s[0], s[1:]
+            tokens.append(Token(t, None))
             continue
 
         if re.match('[0-9]', s[0]):
@@ -190,26 +168,6 @@ def tokenize(s):
 
         if re.match('[_a-zA-Z]', s[0]):
             token, s = tok_ident(s)
-            tokens.append(token)
-            continue
-
-        if re.match('[-+*/^%]', s[0]):
-            token, s = tok_binop(s)
-            tokens.append(token)
-            continue
-
-        if re.match(r'[\(\)]', s[0]):
-            token, s = tok_paren(s)
-            tokens.append(token)
-            continue
-
-        if s[0] == ',':
-            token, s = tok_comma(s)
-            tokens.append(token)
-            continue
-
-        if s[0] == '=':
-            token, s = tok_equal(s)
             tokens.append(token)
             continue
 
