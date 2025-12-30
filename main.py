@@ -15,16 +15,16 @@ class ParseError(RuntimeError):
 
 
 GLOBALS = {
-    'sin': ('f', math.sin),
-    'cos': ('f', math.cos),
-    'tan': ('f', math.tan),
-    'asin': ('f', math.asin),
-    'acos': ('f', math.acos),
-    'atan': ('f', math.atan),
-    'sqrt': ('f', math.sqrt),
-    'exp': ('f', math.exp),
-    'pi': ('v', math.pi),
-    'e': ('v', math.e),
+    'sin': math.sin,
+    'cos': math.cos,
+    'tan': math.tan,
+    'asin': math.asin,
+    'acos': math.acos,
+    'atan': math.atan,
+    'sqrt': math.sqrt,
+    'exp': math.exp,
+    'pi': math.pi,
+    'e': math.e,
 }
 
 
@@ -38,44 +38,52 @@ class Expr:
         self.id = Expr.ID
         Expr.ID += 1
 
-    def eval(self):
+    def eval(self, context={}):
         if self.type is None:
-            return self.left.eval()
+            return self.left.eval(context)
 
         if self.type == 'literal':
             return self.left
 
         if self.type == '+':
-            return self.left.eval() + self.right.eval()
+            return self.left.eval(context) + self.right.eval(context)
 
         if self.type == '-':
             if self.left is None:
-                return -self.right.eval()
-            return self.left.eval() - self.right.eval()
+                return -self.right.eval(context)
+            return self.left.eval(context) - self.right.eval(context)
 
         if self.type == '*':
-            return self.left.eval() * self.right.eval()
+            return self.left.eval(context) * self.right.eval(context)
 
         if self.type == '/':
-            return self.left.eval() / self.right.eval()
+            return self.left.eval(context) / self.right.eval(context)
 
         if self.type == '^':
-            return self.left.eval() ** self.right.eval()
+            return self.left.eval(context) ** self.right.eval(context)
 
         if self.type == '%':
-            return self.left.eval() % self.right.eval()
+            return self.left.eval(context) % self.right.eval(context)
 
         if self.type == 'fcall':
             fname = self.left
             params = self.right
-            type, func = GLOBALS[fname]
-            assert type == 'f'
+
+            if fname in context:
+                func = context[fname]
+            else:
+                func = GLOBALS[fname]
+
             return func(*(p.eval() for p in params))
 
         if self.type == 'var':
             vname = self.left
-            type, value = GLOBALS[vname]
-            assert type == 'v'
+
+            if vname in context:
+                value = context[vname]
+            else:
+                value = GLOBALS[vname]
+
             return value
 
     def __repr__(self):
