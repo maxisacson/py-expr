@@ -86,8 +86,8 @@ class Expr:
 
             return value
 
-        if self.type == 'assign':
-            vname = self.left
+        if self.type == '=':
+            vname = self.left.left
             value = self.right.eval()
             GLOBALS[vname] = value
 
@@ -270,7 +270,7 @@ def parse_expr(tokens):
     return left, tokens
 
 
-def parse_asgn(tokens):
+def parse_assign(tokens):
     ident = tokens.pop(0)
     if ident.type != 'identifier':
         raise ParseError(f"unexpected token: {ident.type}")
@@ -279,14 +279,15 @@ def parse_asgn(tokens):
     if t.type != '=':
         raise ParseError(f"unexpected token: {t.type}")
 
+    left = Expr('var', ident.value)
     expr, tokens = parse_expr(tokens)
 
-    return Expr('assign', ident.value, expr), tokens
+    return Expr('=', left, expr), tokens
 
 
 def parse_stmnt(tokens):
     if peek(tokens).type == 'identifier' and peek(tokens, 1).type == '=':
-        root, tokens = parse_asgn(tokens)
+        root, tokens = parse_assign(tokens)
     else:
         root, tokens = parse_expr(tokens)
 
@@ -371,10 +372,7 @@ def main(argv):
         else:
             expressions.append(expr)
 
-    for expr in assignments:
-        expr.eval()
-
-    for expr in expressions:
+    for expr in assignments + expressions:
         draw_tree(expr)
         result = expr.eval()
 
