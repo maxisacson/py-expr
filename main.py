@@ -304,52 +304,46 @@ def parse_expr(tokens):
     return left, tokens
 
 
-def parse_assign(tokens):
-    ident = tokens.pop(0)
-    if ident.type != 'identifier':
-        raise ParseError(f"unexpected token: {ident.type}")
-
-    left = Expr('var', ident.value)
-
-    t = tokens.pop(0)
-    if t.type == '=':
-        expr, tokens = parse_expr(tokens)
-
-        return Expr('=', left, expr), tokens
-
-    if t.type != ':':
-        raise ParseError(f"unexpected token: {t.type}")
-
-    if peek(tokens).type == '=':
-        param_list = []
-    else:
-        param_list, tokens = parse_param_list(tokens)
-
-    left.right = param_list
-
-    t = tokens.pop(0)
-    if t.type != '=':
-        raise ParseError(f"unexpected token: {t.type}")
-
-    expr, tokens = parse_expr(tokens)
-
-    return Expr(':=', left, expr), tokens
-
-
 def parse_stmnt(tokens):
     if peek(tokens).type == 'identifier' and peek(tokens, 1).type in ['=', ':']:
-        root, tokens = parse_assign(tokens)
-    else:
-        root, tokens = parse_expr(tokens)
+        ident = tokens.pop(0)
+        if ident.type != 'identifier':
+            raise ParseError(f"unexpected token: {ident.type}")
 
-    return root, tokens
+        left = Expr('var', ident.value)
+
+        t = tokens.pop(0)
+        if t.type == '=':
+            expr, tokens = parse_expr(tokens)
+
+            return Expr('=', left, expr), tokens
+
+        if t.type != ':':
+            raise ParseError(f"unexpected token: {t.type}")
+
+        if peek(tokens).type == '=':
+            param_list = []
+        else:
+            param_list, tokens = parse_param_list(tokens)
+
+        left.right = param_list
+
+        t = tokens.pop(0)
+        if t.type != '=':
+            raise ParseError(f"unexpected token: {t.type}")
+
+        expr, tokens = parse_expr(tokens)
+
+        return Expr(':=', left, expr), tokens
+
+    return parse_expr(tokens)
 
 
 def parse(tokens):
-    # stmnt: asgn | expr
-    # asgn:
+    # stmnt:
     #   | 'identifier', '=', expr
     #   | 'identifier', ':', param_list?, '=', expr
+    #   | expr
     # param_list: 'identifier', { ',', identifier }
     # expr: term, { '+' | '-', term }
     # term: factor, { '*' | '/' | '%', factor }
