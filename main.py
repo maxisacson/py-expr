@@ -14,15 +14,17 @@ class ParseError(RuntimeError):
     pass
 
 
-FUNCTIONS = {
-    'sin': math.sin,
-    'cos': math.cos,
-    'tan': math.tan,
-    'asin': math.asin,
-    'acos': math.acos,
-    'atan': math.atan,
-    'sqrt': math.sqrt,
-    'exp': math.exp,
+GLOBALS = {
+    'sin': ('f', math.sin),
+    'cos': ('f', math.cos),
+    'tan': ('f', math.tan),
+    'asin': ('f', math.asin),
+    'acos': ('f', math.acos),
+    'atan': ('f', math.atan),
+    'sqrt': ('f', math.sqrt),
+    'exp': ('f', math.exp),
+    'pi': ('v', math.pi),
+    'e': ('v', math.e),
 }
 
 
@@ -40,7 +42,7 @@ class Expr:
         if self.type is None:
             return self.left.eval()
 
-        if self.type == 'const':
+        if self.type == 'literal':
             return self.left
 
         if self.type == '+':
@@ -66,7 +68,15 @@ class Expr:
         if self.type == 'fcall':
             fname = self.left
             params = self.right
-            return FUNCTIONS[fname](*(p.eval() for p in params))
+            type, func = GLOBALS[fname]
+            assert type == 'f'
+            return func(*(p.eval() for p in params))
+
+        if self.type == 'var':
+            vname = self.left
+            type, value = GLOBALS[vname]
+            assert type == 'v'
+            return value
 
     def __repr__(self):
         return f"Expr({self.type}, {self.left}, {self.right})"
@@ -232,7 +242,7 @@ def parse_atom(tokens):
     if next.type != 'number':
         raise ParseError("expected number")
 
-    return Expr('const', next.value), tokens
+    return Expr('literal', next.value), tokens
 
 
 def parse_factor(tokens):
@@ -308,10 +318,12 @@ def draw_tree(root):
         while len(queue) > 0:
             n = queue.pop()
             if n.id not in ids:
-                if n.type == 'const':
-                    f.write(f'v{n.id}[label="{n.eval()}"];\n')
+                if n.type == 'literal':
+                    f.write(f'v{n.id}[label="{n.left}"];\n')
                 elif n.type == 'fcall':
                     f.write(f'v{n.id}[label="{n.left}()"];\n')
+                elif n.type == 'var':
+                    f.write(f'v{n.id}[label="{n.left}"];\n')
                 else:
                     f.write(f'v{n.id}[label="{n.type}"];\n')
 
