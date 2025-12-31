@@ -44,31 +44,34 @@ class Expr:
         Expr.ID += 1
 
     def eval(self, context={}):
+        return self._eval(context)
+
+    def _eval(self, context):
         if self.type is None:
-            return self.left.eval(context)
+            return self.left._eval(context)
 
         elif self.type == 'literal':
             return self.left
 
         elif self.type == '+':
-            return self.left.eval(context) + self.right.eval(context)
+            return self.left._eval(context) + self.right._eval(context)
 
         elif self.type == '-':
             if self.left is None:
-                return -self.right.eval(context)
-            return self.left.eval(context) - self.right.eval(context)
+                return -self.right._eval(context)
+            return self.left._eval(context) - self.right._eval(context)
 
         elif self.type == '*':
-            return self.left.eval(context) * self.right.eval(context)
+            return self.left._eval(context) * self.right._eval(context)
 
         elif self.type == '/':
-            return self.left.eval(context) / self.right.eval(context)
+            return self.left._eval(context) / self.right._eval(context)
 
         elif self.type == '^':
-            return self.left.eval(context) ** self.right.eval(context)
+            return self.left._eval(context) ** self.right._eval(context)
 
         elif self.type == '%':
-            return self.left.eval(context) % self.right.eval(context)
+            return self.left._eval(context) % self.right._eval(context)
 
         elif self.type == 'fcall':
             fname = self.left
@@ -79,7 +82,7 @@ class Expr:
             else:
                 func = GLOBALS[fname]
 
-            return func(*(p.eval() for p in params))
+            return func(*(p._eval(context) for p in params))
 
         elif self.type == 'var':
             vname = self.left
@@ -93,7 +96,7 @@ class Expr:
 
         elif self.type == '=':
             vname = self.left.left
-            value = self.right.eval()
+            value = self.right._eval(context)
             GLOBALS[vname] = value
 
             return None
@@ -104,7 +107,7 @@ class Expr:
             body = self.right
 
             def f(*args):
-                return body.eval({k:v for k,v in zip(param_list, args)})
+                return body._eval({k:v for k,v in zip(param_list, args)})
 
             GLOBALS[fname] = f
 
