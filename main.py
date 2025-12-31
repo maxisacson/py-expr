@@ -29,6 +29,7 @@ GLOBALS = {
     'exp': math.exp,
     'pi': math.pi,
     'e': math.e,
+    'print': print,
 }
 
 
@@ -95,7 +96,7 @@ class Expr:
             value = self.right.eval()
             GLOBALS[vname] = value
 
-            return value
+            return None
 
         elif self.type == ":=":
             fname = self.left.left
@@ -427,23 +428,29 @@ def parse_expression(s):
 
 def main(argv):
     if len(argv) < 2:
-        exit(1)
+        program = []
+        for line in sys.stdin:
+            exprs = parse_expression(line)
+            program += exprs
+    else:
+        assignments = []
+        expressions = []
 
-    assignments = []
-    expressions = []
+        for e in argv[1:]:
+            exprs = parse_expression(e)
+            if len(exprs) == 1 and exprs[0].type == '=':
+                assignments += exprs
+            else:
+                expressions += exprs
 
-    for e in argv[1:]:
-        exprs = parse_expression(e)
-        if len(exprs) == 1 and exprs[0].type == '=':
-            assignments += exprs
-        else:
-            expressions += exprs
+        program = assignments + expressions
 
-    for expr in assignments + expressions:
+    for expr in program:
         draw_tree(expr)
         result = expr.eval()
 
-    print(result)
+    if result is not None:
+        print(result)
 
 
 if __name__ == "__main__":
