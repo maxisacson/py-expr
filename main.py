@@ -174,7 +174,7 @@ def tokenize(s):
             s = s[1:]
             continue
 
-        if re.match(r'[-+*/^%,=\(\):]', s[0]):
+        if re.match(r'[-+*/^%,=\(\):;]', s[0]):
             t, s = s[0], s[1:]
             tokens.append(Token(t, None))
             continue
@@ -339,7 +339,21 @@ def parse_stmnt(tokens):
     return parse_expr(tokens)
 
 
+def parse_stmnts(tokens):
+    roots = []
+    while True:
+        stmnt, tokens = parse_stmnt(tokens)
+        roots.append(stmnt)
+        if peek(tokens).type == ';':
+            tokens.pop(0)
+        else:
+            break
+
+    return roots, tokens
+
+
 def parse(tokens):
+    # stmnts: stmnt, { ';', stmnt }
     # stmnt:
     #   | 'identifier', '=', expr
     #   | 'identifier', ':', param_list?, '=', expr
@@ -356,12 +370,12 @@ def parse(tokens):
     #   | 'number'
     # params: expr, { ',', expr }
 
-    root, tokens = parse_stmnt(tokens)
+    roots, tokens = parse_stmnts(tokens)
 
     if len(tokens) != 0:
-        raise ParseError("unexpected tokens")
+        raise ParseError(f"unexpected tokens: {tokens[0]}")
 
-    return root
+    return roots
 
 
 def draw_tree(root):
@@ -414,11 +428,11 @@ def main(argv):
     expressions = []
 
     for e in argv[1:]:
-        expr = parse_expression(e)
-        if expr.type == 'assign':
-            assignments.append(expr)
+        exprs = parse_expression(e)
+        if len(exprs) == 1 and exprs[0].type == '=':
+            assignments += exprs
         else:
-            expressions.append(expr)
+            expressions += exprs
 
     for expr in assignments + expressions:
         draw_tree(expr)
