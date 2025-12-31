@@ -431,7 +431,16 @@ def main(argv):
         program = []
         for line in sys.stdin:
             exprs = parse_expression(line)
-            program += exprs
+
+            if sys.stdin.isatty():
+                for expr in exprs:
+                    result = expr.eval()
+                    if result is not None:
+                        GLOBALS['_'] = result
+                        GLOBALS['ans'] = result
+                        print('=', result)
+            else:
+                program += exprs
     else:
         assignments = []
         expressions = []
@@ -445,6 +454,7 @@ def main(argv):
 
         program = assignments + expressions
 
+    result = None
     for expr in program:
         draw_tree(expr)
         result = expr.eval()
