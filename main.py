@@ -174,6 +174,11 @@ def tokenize(s):
             s = s[1:]
             continue
 
+        if s[0] == ';':
+            if tokens and tokens[-1].type == ';':
+                s = s[1:]
+                continue
+
         if re.match(r'[-+*/^%,=\(\):;]', s[0]):
             t, s = s[0], s[1:]
             tokens.append(Token(t, None))
@@ -285,7 +290,7 @@ def parse_factor(tokens):
 def parse_term(tokens):
     left, tokens = parse_factor(tokens)
 
-    while len(tokens) > 0 and tokens[0].type in ['*', '/', '%']:
+    while tokens and tokens[0].type in ['*', '/', '%']:
         type, tokens = tokens[0].type, tokens[1:]
         right, tokens = parse_factor(tokens)
         left = Expr(type, left, right)
@@ -296,7 +301,7 @@ def parse_term(tokens):
 def parse_expr(tokens):
     left, tokens = parse_term(tokens)
 
-    while len(tokens) > 0 and tokens[0].type in ['+', '-']:
+    while tokens and tokens[0].type in ['+', '-']:
         type, tokens = tokens[0].type, tokens[1:]
         right, tokens = parse_term(tokens)
         left = Expr(type, left, right)
@@ -341,7 +346,7 @@ def parse_stmnt(tokens):
 
 def parse_stmnts(tokens):
     roots = []
-    while True:
+    while tokens:
         stmnt, tokens = parse_stmnt(tokens)
         roots.append(stmnt)
         if peek(tokens).type == ';':
@@ -353,7 +358,7 @@ def parse_stmnts(tokens):
 
 
 def parse(tokens):
-    # stmnts: stmnt, { ';', stmnt }
+    # stmnts: stmnt, { ';', stmnt }, ';'?
     # stmnt:
     #   | 'identifier', '=', expr
     #   | 'identifier', ':', param_list?, '=', expr
@@ -372,7 +377,7 @@ def parse(tokens):
 
     roots, tokens = parse_stmnts(tokens)
 
-    if len(tokens) != 0:
+    if tokens:
         raise ParseError(f"unexpected tokens: {tokens[0]}")
 
     return roots
@@ -385,7 +390,7 @@ def draw_tree(root):
         f.write("graph {\n")
 
         queue = [root]
-        while len(queue) > 0:
+        while queue:
             n = queue.pop()
             if n.id not in ids:
                 if n.type == 'literal':
