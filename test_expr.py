@@ -118,7 +118,7 @@ TEST_DATA = [
 
 @pytest.mark.parametrize("expression, expected", TEST_DATA)
 def test_expr(expression, expected):
-    e = parse_expression(expression)
+    e, = parse_expression(expression)
     actual = e.eval()
 
     assert actual == expected
