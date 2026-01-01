@@ -4,6 +4,23 @@ import sys
 import re
 import subprocess
 import math
+from functools import wraps
+
+TRACE = False
+
+
+def trace(f):
+    if not TRACE:
+        return f
+
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        print(f"{f.__name__} args={args} kwargs={kwargs}")
+        ret = f(*args, **kwargs)
+        print(f"{f.__name__} -> {ret}")
+        return ret
+
+    return wrapper
 
 
 class TokenError(RuntimeError):
@@ -18,6 +35,11 @@ class EvalError(RuntimeError):
     pass
 
 
+COMMANDS = {
+    'print': print,
+}
+
+
 GLOBALS = {
     'sin': math.sin,
     'cos': math.cos,
@@ -29,7 +51,6 @@ GLOBALS = {
     'exp': math.exp,
     'pi': math.pi,
     'e': math.e,
-    'print': print,
 }
 
 
@@ -113,6 +134,13 @@ class Expr:
 
             return None
 
+        elif self.type == 'cmd':
+            cname = self.left
+            params = self.right
+            cmd = COMMANDS[cname]
+
+            return cmd(*(p._eval(context) for p in params))
+
         raise EvalError(f"unknown expression type: {self.type}")
 
     def __repr__(self):
@@ -156,20 +184,24 @@ def tok_paren(s):
     return Token(t, None), s
 
 
-def tok_ident(s):
+def tok_ident_or_keyword(s):
     t, s = s[0], s[1:]
 
     if not re.match('[_a-zA-Z]', t):
         raise TokenError(f"unexpected token: {t}")
 
     token = t
-    while len(s) > 0 and re.match('[_a-zA-Z0-9]', s[0]):
+    while len(s) > 0 and re.match("[_a-zA-Z0-9']", s[0]):
         token += s[0]
         s = s[1:]
+
+    if token in COMMANDS:
+        return Token('command', token), s
 
     return Token('identifier', token), s
 
 
+@trace
 def tokenize(s):
     tokens = []
 
@@ -194,7 +226,7 @@ def tokenize(s):
             continue
 
         if re.match('[_a-zA-Z]', s[0]):
-            token, s = tok_ident(s)
+            token, s = tok_ident_or_keyword(s)
             tokens.append(token)
             continue
 
@@ -210,6 +242,7 @@ def peek(tokens, offset=0):
     return Token(None, None)
 
 
+@trace
 def parse_params(tokens):
     params = []
 
@@ -224,6 +257,7 @@ def parse_params(tokens):
     return params, tokens
 
 
+@trace
 def parse_param_list(tokens):
     param_list = []
 
@@ -240,6 +274,7 @@ def parse_param_list(tokens):
     return param_list, tokens
 
 
+@trace
 def parse_atom(tokens):
     next = tokens.pop(0)
 
@@ -275,6 +310,7 @@ def parse_atom(tokens):
     return Expr('literal', next.value), tokens
 
 
+@trace
 def parse_factor(tokens):
     if peek(tokens).type == '-':
         tokens = tokens[1:]
@@ -291,6 +327,7 @@ def parse_factor(tokens):
     return left, tokens
 
 
+@trace
 def parse_term(tokens):
     left, tokens = parse_factor(tokens)
 
@@ -302,6 +339,7 @@ def parse_term(tokens):
     return left, tokens
 
 
+@trace
 def parse_expr(tokens):
     left, tokens = parse_term(tokens)
 
@@ -313,8 +351,26 @@ def parse_expr(tokens):
     return left, tokens
 
 
+@trace
 def parse_stmnt(tokens):
-    if peek(tokens).type == 'identifier' and peek(tokens, 1).type in ['=', ':']:
+    stmnt, tokens = parse_simple_stmnt(tokens)
+    if peek(tokens).type == ';':
+        tokens.pop(0)
+    return stmnt, tokens
+
+
+@trace
+def parse_simple_stmnt(tokens):
+    if peek(tokens).type == 'command':
+        left = tokens.pop(0)
+        next = peek(tokens)
+        if next.type is None or next.type == ';':
+            params = []
+        else:
+            params, tokens = parse_params(tokens)
+        return Expr('cmd', left.value, params), tokens
+
+    elif peek(tokens).type == 'identifier' and peek(tokens, 1).type in ['=', ':']:
         ident = tokens.pop(0)
         if ident.type != 'identifier':
             raise ParseError(f"unexpected token: {ident.type}")
@@ -327,43 +383,42 @@ def parse_stmnt(tokens):
 
             return Expr('=', left, expr), tokens
 
-        if t.type != ':':
-            raise ParseError(f"unexpected token: {t.type}")
+        elif t.type == ':':
+            if peek(tokens).type == '=':
+                param_list = []
+            else:
+                param_list, tokens = parse_param_list(tokens)
 
-        if peek(tokens).type == '=':
-            param_list = []
-        else:
-            param_list, tokens = parse_param_list(tokens)
+            left.right = param_list
 
-        left.right = param_list
+            t = tokens.pop(0)
+            if t.type != '=':
+                raise ParseError(f"unexpected token: {t.type}")
 
-        t = tokens.pop(0)
-        if t.type != '=':
-            raise ParseError(f"unexpected token: {t.type}")
+            expr, tokens = parse_expr(tokens)
 
-        expr, tokens = parse_expr(tokens)
+            return Expr(':=', left, expr), tokens
 
-        return Expr(':=', left, expr), tokens
+        raise ParseError(f"unexpected token: {t.type}")
 
     return parse_expr(tokens)
 
 
+@trace
 def parse_stmnts(tokens):
     roots = []
     while tokens:
         stmnt, tokens = parse_stmnt(tokens)
         roots.append(stmnt)
-        if peek(tokens).type == ';':
-            tokens.pop(0)
-        else:
-            break
 
     return roots, tokens
 
 
 def parse(tokens):
-    # stmnts: stmnt, { ';', stmnt }, ';'?
-    # stmnt:
+    # stmnts: stmnt+
+    # stmnt: simple_stmnt, ';'?
+    # simple_stmnt:
+    #   | 'command', params?
     #   | 'identifier', '=', expr
     #   | 'identifier', ':', param_list?, '=', expr
     #   | expr
