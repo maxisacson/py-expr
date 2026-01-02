@@ -23,15 +23,19 @@ def trace(f):
     return wrapper
 
 
-class TokenError(RuntimeError):
+class ExprError(BaseException):
     pass
 
 
-class ParseError(RuntimeError):
+class TokenError(ExprError):
     pass
 
 
-class EvalError(RuntimeError):
+class ParseError(ExprError):
+    pass
+
+
+class EvalError(ExprError):
     pass
 
 
@@ -52,6 +56,59 @@ GLOBALS = {
     'pi': math.pi,
     'e': math.e,
 }
+
+
+def binop_reduce(op, context, left, right):
+    if isinstance(left, Expr):
+        return binop_reduce(op, context, left.eval(context), right)
+
+    if isinstance(right, Expr):
+        return binop_reduce(op, context, left, right.eval(context))
+
+    if isinstance(left, list) and isinstance(right, list):
+        if len(left) != len(right):
+            raise EvalError('expected lists to have the same length')
+        return [op(x, y) for (x, y) in zip(left, right)]
+    elif isinstance(left, list):
+        return [op(x, right) for x in left]
+    elif isinstance(right, list):
+        return [op(left, x) for x in right]
+
+    return op(left, right)
+
+
+def unop_reduce(op, context, right):
+    if isinstance(right, Expr):
+        return unop_reduce(op, context, right.eval(context))
+
+    if isinstance(right, list):
+        return [op(x) for x in right]
+
+    return op(right)
+
+
+def func_reduce(f, context, *args):
+    for i,arg in enumerate(args):
+        if isinstance(arg, Expr):
+            return func_reduce(f, context, *args[:i], arg.eval(context), *args[i+1:])
+
+    k = 0
+    count = 0
+    for i,arg in enumerate(args):
+        if isinstance(arg, list):
+            k = i
+            count += 1
+
+    if count == 0:
+        return f(*args)
+
+    if count == 1:
+        return [f(*args[:k], x, *args[k+1:]) for x in args[k]]
+
+    if count == len(args):
+        return [f(*a) for a in zip(*args)]
+
+    raise EvalError('expected 0, 1, or all arguments to be list')
 
 
 class Expr:
@@ -75,24 +132,25 @@ class Expr:
             return self.left
 
         elif self.type == '+':
-            return self.left._eval(context) + self.right._eval(context)
+            return binop_reduce(lambda x, y: x + y, context, self.left, self.right)
 
         elif self.type == '-':
             if self.left is None:
-                return -self.right._eval(context)
-            return self.left._eval(context) - self.right._eval(context)
+                return unop_reduce(lambda x: -x, context, self.right)
+
+            return binop_reduce(lambda x, y: x - y, context, self.left, self.right)
 
         elif self.type == '*':
-            return self.left._eval(context) * self.right._eval(context)
+            return binop_reduce(lambda x, y: x * y, context, self.left, self.right)
 
         elif self.type == '/':
-            return self.left._eval(context) / self.right._eval(context)
+            return binop_reduce(lambda x, y: x / y, context, self.left, self.right)
 
         elif self.type == '^':
-            return self.left._eval(context) ** self.right._eval(context)
+            return binop_reduce(lambda x, y: x ** y, context, self.left, self.right)
 
         elif self.type == '%':
-            return self.left._eval(context) % self.right._eval(context)
+            return binop_reduce(lambda x, y: x % y, context, self.left, self.right)
 
         elif self.type == 'fcall':
             fname = self.left
@@ -103,7 +161,7 @@ class Expr:
             else:
                 func = GLOBALS[fname]
 
-            return func(*(p._eval(context) for p in params))
+            return func_reduce(func, context, *params)
 
         elif self.type == 'var':
             vname = self.left
@@ -141,6 +199,15 @@ class Expr:
 
             return cmd(*(p._eval(context) for p in params))
 
+        elif self.type == 'range':
+            left = self.left._eval(context)
+            right = self.right._eval(context)
+
+            return list(range(left, right+1))
+
+        elif self.type == 'list':
+            return [x._eval(context) for x in self.left]
+
         raise EvalError(f"unknown expression type: {self.type}")
 
     def __repr__(self):
@@ -164,24 +231,16 @@ def tok_number(s):
         s = s[1:]
 
     if len(s) > 0 and s[0] == '.':
-        token += s[0]
-        s = s[1:]
-        type = float
+        if len(s) == 1 or len(s) > 1 and s[1] != '.':
+            token += s[0]
+            s = s[1:]
+            type = float
 
     while len(s) > 0 and re.match('[0-9]', s[0]):
         token += s[0]
         s = s[1:]
 
     return Token('number', type(token)), s
-
-
-def tok_paren(s):
-    t, s = s[0], s[1:]
-
-    if not re.match(r'[\(\)]', t):
-        raise TokenError(f"unexpected token: {t}")
-
-    return Token(t, None), s
 
 
 def tok_ident_or_keyword(s):
@@ -201,6 +260,18 @@ def tok_ident_or_keyword(s):
     return Token('identifier', token), s
 
 
+def tok_range(s):
+    token = ''
+
+    for _ in range(2):
+        t, s = s[0], s[1:]
+        if t != '.':
+            raise TokenError(f"unexpected token: {t}")
+        token += t
+
+    return Token('..', token), s
+
+
 @trace
 def tokenize(s):
     tokens = []
@@ -215,7 +286,7 @@ def tokenize(s):
                 s = s[1:]
                 continue
 
-        if re.match(r'[-+*/^%,=\(\):;]', s[0]):
+        if re.match(r'[-+*/^%,=\(\):;\[\]]', s[0]):
             t, s = s[0], s[1:]
             tokens.append(Token(t, None))
             continue
@@ -227,6 +298,11 @@ def tokenize(s):
 
         if re.match('[_a-zA-Z]', s[0]):
             token, s = tok_ident_or_keyword(s)
+            tokens.append(token)
+            continue
+
+        if s[0] == '.':
+            token, s = tok_range(s)
             tokens.append(token)
             continue
 
@@ -297,17 +373,38 @@ def parse_atom(tokens):
     if next.type == '(':
         expr, tokens = parse_expr(tokens)
 
-        if tokens[0].type == ')':
+        if peek(tokens).type == ')':
             tokens = tokens[1:]
         else:
             raise ParseError("expected closing )")
 
         return expr, tokens
 
+    if next.type == '[':
+        exprs, tokens = parse_params(tokens)
+        if peek(tokens).type != ']':
+            raise ParseError('expected ]')
+        tokens.pop(0)
+        return Expr('list', exprs), tokens
+
     if next.type != 'number':
         raise ParseError("expected number")
 
     return Expr('literal', next.value), tokens
+
+
+@trace
+def parse_range(tokens):
+    left, tokens = parse_expr(tokens)
+
+    if peek(tokens).type != '..':
+        raise ParseError('expected range expression')
+
+    tokens.pop(0)
+
+    right, tokens = parse_expr(tokens)
+
+    return Expr('range', left, right), tokens
 
 
 @trace
@@ -341,6 +438,17 @@ def parse_term(tokens):
 
 @trace
 def parse_expr(tokens):
+    left, tokens = parse_simple_expr(tokens)
+    if peek(tokens).type == '..':
+        tokens.pop(0)
+        right, tokens = parse_expr(tokens)
+        left = Expr('range', left, right)
+
+    return left, tokens
+
+
+@trace
+def parse_simple_expr(tokens):
     left, tokens = parse_term(tokens)
 
     while tokens and tokens[0].type in ['+', '-']:
@@ -423,7 +531,10 @@ def parse(tokens):
     #   | 'identifier', ':', param_list?, '=', expr
     #   | expr
     # param_list: 'identifier', { ',', identifier }
-    # expr: term, { '+' | '-', term }
+    # expr:
+    #   | simple_expr, [ '..', simple_expr ]
+    # simple_expr:
+    #   | term, { '+' | '-', term }
     # term: factor, { '*' | '/' | '%', factor }
     # factor:
     #   | '-', factor
@@ -431,6 +542,7 @@ def parse(tokens):
     # atom:
     #   | 'identifier', [ '(', params?, ')' ]
     #   | '(', expr, ')'
+    #   | '[', params?, ']'
     #   | 'number'
     # params: expr, { ',', expr }
 
@@ -458,10 +570,16 @@ def draw_tree(root):
                     f.write(f'v{n.id}[label="{n.left}()"];\n')
                 elif n.type == 'var':
                     f.write(f'v{n.id}[label="{n.left}"];\n')
+                elif n.type == 'cmd':
+                    f.write(f'v{n.id}[label="{n.left}"];\n')
                 else:
                     f.write(f'v{n.id}[label="{n.type}"];\n')
 
             if n.type == 'fcall':
+                children = n.right
+            elif n.type == 'list':
+                children = n.left
+            elif n.type == 'cmd':
                 children = n.right
             else:
                 children = [n.left, n.right]
@@ -484,7 +602,7 @@ def parse_expression(s):
     return expr
 
 
-def main(argv):
+def _main(argv):
     if len(argv) < 2:
         program = []
         for line in sys.stdin:
@@ -519,6 +637,14 @@ def main(argv):
 
     if result is not None:
         print(result)
+
+
+def main(argv):
+    try:
+        _main(argv)
+    except ExprError as e:
+        print(f'Error: {e}')
+        exit(1)
 
 
 if __name__ == "__main__":
