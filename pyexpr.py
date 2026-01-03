@@ -39,6 +39,30 @@ class EvalError(ExprError):
     pass
 
 
+def _table(context, *args):
+    cols = []
+    rows = 0
+    for a in args:
+        y = a.eval(context)
+        if isinstance(y, list):
+            cols.append(y)
+        else:
+            cols.append([y])
+
+        n = len(cols[-1])
+        if rows > 0 and n != rows and n != 1:
+            raise EvalError("print: arguments have to be either size 1 or size N")
+
+        rows = max(rows, n)
+
+    for i,c in enumerate(cols):
+        if len(c) < rows:
+            cols[i] = [c[0]] * rows
+
+    for row in zip(*cols):
+        print(*row)
+
+
 def _print(context, *args):
     p = [a.eval(context) for a in args]
     print(*p)
@@ -55,6 +79,7 @@ def _ast(_, *args):
 
 COMMANDS = {
     'print': _print,
+    'table': _table,
     'ast': _ast,
 }
 
