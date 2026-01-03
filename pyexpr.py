@@ -15,7 +15,7 @@ def trace(f):
 
     @wraps(f)
     def wrapper(*args, **kwargs):
-        print(f"{f.__name__} args={args} kwargs={kwargs}")
+        print(f"{f.__name__} <- {args} {kwargs}")
         ret = f(*args, **kwargs)
         print(f"{f.__name__} -> {ret}")
         return ret
@@ -39,8 +39,23 @@ class EvalError(ExprError):
     pass
 
 
+def _print(context, *args):
+    p = [a.eval(context) for a in args]
+    print(*p)
+
+
+def _ast(_, *args):
+    if len(args) != 1:
+        raise EvalError("ast: expected 1 argument")
+
+    expr = args[0]
+    draw_tree(expr, "ast")
+    subprocess.run(["xdg-open", "ast.svg"])
+
+
 COMMANDS = {
-    'print': print,
+    'print': _print,
+    'ast': _ast,
 }
 
 
@@ -196,8 +211,7 @@ class Expr:
             cname = self.left
             params = self.right
             cmd = COMMANDS[cname]
-
-            return cmd(*(p._eval(context) for p in params))
+            return cmd(context, *params)
 
         elif self.type == 'range':
             left = self.left._eval(context)
@@ -331,6 +345,21 @@ def parse_params(tokens):
             break
 
     return params, tokens
+
+
+@trace
+def parse_command_args(tokens):
+    args = []
+
+    while True:
+        p, tokens = parse_simple_stmnt(tokens)
+        args.append(p)
+        if peek(tokens).type == ',':
+            tokens.pop(0)
+        else:
+            break
+
+    return args, tokens
 
 
 @trace
@@ -475,7 +504,7 @@ def parse_simple_stmnt(tokens):
         if next.type is None or next.type == ';':
             params = []
         else:
-            params, tokens = parse_params(tokens)
+            params, tokens = parse_command_args(tokens)
         return Expr('cmd', left.value, params), tokens
 
     elif peek(tokens).type == 'identifier' and peek(tokens, 1).type in ['=', ':']:
@@ -526,7 +555,7 @@ def parse(tokens):
     # stmnts: stmnt+
     # stmnt: simple_stmnt, ';'?
     # simple_stmnt:
-    #   | 'command', params?
+    #   | 'command', command_args?
     #   | 'identifier', '=', expr
     #   | 'identifier', ':', param_list?, '=', expr
     #   | expr
@@ -545,6 +574,7 @@ def parse(tokens):
     #   | '[', params?, ']'
     #   | 'number'
     # params: expr, { ',', expr }
+    # command_args: simple_stmnt, { ',', simple_stmnt }
 
     roots, tokens = parse_stmnts(tokens)
 
@@ -554,10 +584,10 @@ def parse(tokens):
     return roots
 
 
-def draw_tree(root):
+def draw_tree(root, fname="tree"):
     ids = set()
 
-    with open("tree.dot", 'w') as f:
+    with open(f"{fname}.dot", 'w') as f:
         f.write("graph {\n")
 
         queue = [root]
@@ -593,7 +623,7 @@ def draw_tree(root):
 
         f.write("}\n")
 
-    subprocess.run(["dot", "-Tsvg", "-otree.svg", "tree.dot"])
+    subprocess.run(["dot", "-Tsvg", f"-o{fname}.svg", f"{fname}.dot"])
 
 
 def parse_expression(s):

@@ -1,7 +1,9 @@
 # py-expr
 
 Parse and evaluate simple mathematical expressions in pure python without
-dependencies
+dependencies*.
+
+(*) the `ast` command requires the `graphviz` program to be installed.
 
 ## Examples
 
