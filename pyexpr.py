@@ -251,7 +251,12 @@ class Expr:
             left = self.left._eval(context)
             right = self.right._eval(context)
 
-            return list(range(left, right+1))
+            if isinstance(left, int) and isinstance(right, int):
+                return list(range(left, right+1))
+
+            N = 10
+            delta = (right - left) / (N-1)
+            return [left + i*delta for i in range(N)]
 
         elif self.type == 'list':
             return [x._eval(context) for x in self.left]
@@ -279,7 +284,7 @@ def tok_number(s):
         s = s[1:]
 
     if len(s) > 0 and s[0] == '.':
-        if len(s) == 1 or len(s) > 1 and s[1] != '.':
+        if len(s) > 1 and s[1] != '.' or len(s) > 2 and s[1] == '.' and s[2] == '.':
             token += s[0]
             s = s[1:]
             type = float
