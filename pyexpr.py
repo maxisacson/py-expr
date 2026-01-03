@@ -248,15 +248,49 @@ class Expr:
             return cmd(context, *params)
 
         elif self.type == 'range':
-            left = self.left._eval(context)
-            right = self.right._eval(context)
+            if isinstance(self.left, list):
+                left = self.left[0]._eval(context)
+                right = self.left[1]._eval(context)
+                step = self.right[0]._eval(context)
+                type = self.right[1]
+            else:
+                left = self.left._eval(context)
+                right = self.right._eval(context)
+                step = 'auto'
+                type = 'count'
 
             if isinstance(left, int) and isinstance(right, int):
-                return list(range(left, right+1))
+                if type == 'count' and step == 'auto':
+                    return list(range(left, right+1, 1))
+                elif type == 'incr' and isinstance(step, int):
+                    return list(range(left, right+1, step))
+                elif type == 'count' and isinstance(step, int):
+                    count = step
+                    if (right - left) % (count - 1) == 0:
+                        step = (right - left) // (count - 1)
+                        return list(range(left, right+1, step))
 
-            N = 10
-            delta = (right - left) / (N-1)
-            return [left + i*delta for i in range(N)]
+            if type == 'count':
+                if step == 'auto':
+                    count = 50
+                else:
+                    count = step
+                step = (right - left) / (count - 1)
+                return [left + i*step for i in range(count)]
+            elif type == 'incr':
+                if step == 'auto':
+                    count = 50
+                    step = (right - left) / (count - 1)
+                    return [left + i*step for i in range(count)]
+                else:
+                    def g():
+                        x = left
+                        while x <= right:
+                            yield x
+                            x += step
+                    return list(g())
+
+            raise EvalError(f"Error: unknown range type: {type}")
 
         elif self.type == 'list':
             return [x._eval(context) for x in self.left]
@@ -477,20 +511,6 @@ def parse_atom(tokens):
 
 
 @trace
-def parse_range(tokens):
-    left, tokens = parse_expr(tokens)
-
-    if peek(tokens).type != '..':
-        raise ParseError('expected range expression')
-
-    tokens.pop(0)
-
-    right, tokens = parse_expr(tokens)
-
-    return Expr('range', left, right), tokens
-
-
-@trace
 def parse_factor(tokens):
     if peek(tokens).type == '-':
         tokens = tokens[1:]
@@ -522,9 +542,22 @@ def parse_term(tokens):
 @trace
 def parse_expr(tokens):
     left, tokens = parse_simple_expr(tokens)
+
     if peek(tokens).type == '..':
         tokens.pop(0)
-        right, tokens = parse_expr(tokens)
+        right, tokens = parse_simple_expr(tokens)
+
+        if peek(tokens).type == '..':
+            tokens.pop(0)
+            if peek(tokens).type == '+':
+                tokens.pop(0)
+                type = 'incr'
+            else:
+                type = 'count'
+            step, tokens = parse_simple_expr(tokens)
+            left = [left, right]
+            right = [step, type]
+
         left = Expr('range', left, right)
 
     return left, tokens
@@ -614,7 +647,7 @@ def parse(tokens):
     #   | expr
     # param_list: 'identifier', { ',', identifier }
     # expr:
-    #   | simple_expr, [ '..', simple_expr ]
+    #   | simple_expr, [ '..', simple_expr, [ '..', ('+' | '-')?, simple_expr ] ]
     # simple_expr:
     #   | term, { '+' | '-', term }
     # term: factor, { '*' | '/' | '%', factor }
@@ -649,12 +682,22 @@ def draw_tree(root, fname="tree"):
             if n.id not in ids:
                 if n.type == 'literal':
                     f.write(f'v{n.id}[label="{n.left}"];\n')
+
                 elif n.type == 'fcall':
                     f.write(f'v{n.id}[label="{n.left}()"];\n')
+
                 elif n.type == 'var':
                     f.write(f'v{n.id}[label="{n.left}"];\n')
+
                 elif n.type == 'cmd':
                     f.write(f'v{n.id}[label="{n.left}"];\n')
+
+                elif n.type == 'range':
+                    if isinstance(n.right, list) and n.right[1] == 'incr':
+                        f.write(f'v{n.id}[label="{n.type}+"];\n')
+                    else:
+                        f.write(f'v{n.id}[label="{n.type}"];\n')
+
                 else:
                     f.write(f'v{n.id}[label="{n.type}"];\n')
 
@@ -664,6 +707,11 @@ def draw_tree(root, fname="tree"):
                 children = n.left
             elif n.type == 'cmd':
                 children = n.right
+            elif n.type == 'range':
+                if isinstance(n.left, list):
+                    children = n.left + n.right
+                else:
+                    children = [n.left, n.right]
             else:
                 children = [n.left, n.right]
 
