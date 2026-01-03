@@ -8,6 +8,8 @@ from functools import wraps
 
 TRACE = False
 
+depth = 0
+
 
 def trace(f):
     if not TRACE:
@@ -15,9 +17,16 @@ def trace(f):
 
     @wraps(f)
     def wrapper(*args, **kwargs):
-        print(f"{f.__name__} <- {args} {kwargs}")
+        global depth
+
+        print(f"{'  '*depth}{f.__name__} <- {args} {kwargs}")
+        depth += 1
+
         ret = f(*args, **kwargs)
-        print(f"{f.__name__} -> {ret}")
+
+        depth -= 1
+        print(f"{'  '*depth}{f.__name__} -> {ret}")
+
         return ret
 
     return wrapper
@@ -279,6 +288,18 @@ def tok_number(s):
         token += s[0]
         s = s[1:]
 
+    if len(s) > 0 and re.match('[eE]', s[0]):
+        token += s[0]
+        s = s[1:]
+        type = float
+        if len(s) > 0 and s[0] == '-':
+            token += s[0]
+            s = s[1:]
+
+    while len(s) > 0 and re.match('[0-9]', s[0]):
+        token += s[0]
+        s = s[1:]
+
     return Token('number', type(token)), s
 
 
@@ -341,7 +362,10 @@ def tokenize(s):
             continue
 
         if s[0] == '.':
-            token, s = tok_range(s)
+            if len(s) > 1 and s[1] == '.':
+                token, s = tok_range(s)
+            else:
+                token, s = tok_number("0" + s)
             tokens.append(token)
             continue
 
@@ -377,7 +401,7 @@ def parse_command_args(tokens):
     args = []
 
     while True:
-        p, tokens = parse_simple_stmnt(tokens)
+        p, tokens = parse_stmnt(tokens)
         args.append(p)
         if peek(tokens).type == ',':
             tokens.pop(0)
@@ -515,14 +539,6 @@ def parse_simple_expr(tokens):
 
 @trace
 def parse_stmnt(tokens):
-    stmnt, tokens = parse_simple_stmnt(tokens)
-    if peek(tokens).type == ';':
-        tokens.pop(0)
-    return stmnt, tokens
-
-
-@trace
-def parse_simple_stmnt(tokens):
     if peek(tokens).type == 'command':
         left = tokens.pop(0)
         next = peek(tokens)
@@ -568,18 +584,25 @@ def parse_simple_stmnt(tokens):
 
 @trace
 def parse_stmnts(tokens):
-    roots = []
-    while tokens:
-        stmnt, tokens = parse_stmnt(tokens)
-        roots.append(stmnt)
+    stmnts = []
 
-    return roots, tokens
+    while tokens:
+        s, tokens = parse_stmnt(tokens)
+        stmnts.append(s)
+        if peek(tokens).type == ';':
+            tokens.pop(0)
+        else:
+            break
+
+    if peek(tokens).type == ';':
+        tokens.pop(0)
+
+    return stmnts, tokens
 
 
 def parse(tokens):
-    # stmnts: stmnt+
-    # stmnt: simple_stmnt, ';'?
-    # simple_stmnt:
+    # stmnts: stmnt, { ';', stmnt }, ';'?
+    # stmnt:
     #   | 'command', command_args?
     #   | 'identifier', '=', expr
     #   | 'identifier', ':', param_list?, '=', expr
@@ -599,7 +622,7 @@ def parse(tokens):
     #   | '[', params?, ']'
     #   | 'number'
     # params: expr, { ',', expr }
-    # command_args: simple_stmnt, { ',', simple_stmnt }
+    # command_args: stmnt, { ',', stmnt }
 
     roots, tokens = parse_stmnts(tokens)
 
