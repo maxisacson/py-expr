@@ -93,6 +93,14 @@ COMMANDS = {
 }
 
 
+KEYWORDS = {
+    'if',
+    'and',
+    'or',
+    'not',
+}
+
+
 GLOBALS = {
     'sin': math.sin,
     'cos': math.cos,
@@ -173,6 +181,7 @@ class Expr:
     def eval(self, context={}):
         return self._eval(context)
 
+    @trace
     def _eval(self, context):
         if self.type is None:
             return self.left._eval(context)
@@ -184,8 +193,8 @@ class Expr:
             return binop_reduce(lambda x, y: x + y, context, self.left, self.right)
 
         elif self.type == '-':
-            if self.left is None:
-                return unop_reduce(lambda x: -x, context, self.right)
+            if self.right is None:
+                return unop_reduce(lambda x: -x, context, self.left)
 
             return binop_reduce(lambda x, y: x - y, context, self.left, self.right)
 
@@ -200,6 +209,24 @@ class Expr:
 
         elif self.type == '%':
             return binop_reduce(lambda x, y: x % y, context, self.left, self.right)
+
+        elif self.type == '<':
+            return binop_reduce(lambda x, y: x < y, context, self.left, self.right)
+
+        elif self.type == '>':
+            return binop_reduce(lambda x, y: x > y, context, self.left, self.right)
+
+        elif self.type == '<=':
+            return binop_reduce(lambda x, y: x <= y, context, self.left, self.right)
+
+        elif self.type == '>=':
+            return binop_reduce(lambda x, y: x >= y, context, self.left, self.right)
+
+        elif self.type == '==':
+            return binop_reduce(lambda x, y: x == y, context, self.left, self.right)
+
+        elif self.type == '!=':
+            return binop_reduce(lambda x, y: x != y, context, self.left, self.right)
 
         elif self.type == 'fcall':
             fname = self.left
@@ -295,6 +322,32 @@ class Expr:
         elif self.type == 'list':
             return [x._eval(context) for x in self.left]
 
+        elif self.type == 'if':
+            cond = self.right._eval(context)
+            if cond:
+                return self.left._eval(context)
+
+            return None
+
+        elif self.type == 'cases':
+            cases = self.left
+            lastcase = self.right
+            for x in cases:
+                result = x._eval(context)
+                if result is not None:
+                    return result
+
+            return lastcase._eval(context)
+
+        elif self.type == 'or':
+            return self.left._eval(context) or self.right._eval(context)
+
+        elif self.type == 'and':
+            return self.left._eval(context) and self.right._eval(context)
+
+        elif self.type == 'not':
+            return not self.left._eval(context)
+
         raise EvalError(f"unknown expression type: {self.type}")
 
     def __repr__(self):
@@ -353,6 +406,9 @@ def tok_ident_or_keyword(s):
         token += s[0]
         s = s[1:]
 
+    if token in KEYWORDS:
+        return Token(token, None), s
+
     if token in COMMANDS:
         return Token('command', token), s
 
@@ -385,8 +441,16 @@ def tokenize(s):
                 s = s[1:]
                 continue
 
-        if re.match(r'[-+*/^%,=\(\):;\[\]]', s[0]):
+        if re.match(r'[-+*/^%,\(\):;\[\]\{\}]', s[0]):
             t, s = s[0], s[1:]
+            tokens.append(Token(t, None))
+            continue
+
+        if re.match('[<>=!]', s[0]):
+            t, s = s[0], s[1:]
+            if len(s) > 0 and s[0] == '=':
+                t += s[0]
+                s = s[1:]
             tokens.append(Token(t, None))
             continue
 
@@ -504,6 +568,13 @@ def parse_atom(tokens):
         tokens.pop(0)
         return Expr('list', exprs), tokens
 
+    if next.type == '{':
+        cases, tokens = parse_cases(tokens)
+        if peek(tokens).type != '}':
+            raise ParseError('expected }')
+        tokens.pop(0)
+        return cases, tokens
+
     if next.type != 'number':
         raise ParseError("expected number")
 
@@ -514,8 +585,8 @@ def parse_atom(tokens):
 def parse_factor(tokens):
     if peek(tokens).type == '-':
         tokens = tokens[1:]
-        right, tokens = parse_factor(tokens)
-        return Expr('-', None, right), tokens
+        left, tokens = parse_factor(tokens)
+        return Expr('-', left), tokens
 
     left, tokens = parse_atom(tokens)
 
@@ -541,11 +612,11 @@ def parse_term(tokens):
 
 @trace
 def parse_expr(tokens):
-    left, tokens = parse_simple_expr(tokens)
+    left, tokens = parse_disj(tokens)
 
     if peek(tokens).type == '..':
         tokens.pop(0)
-        right, tokens = parse_simple_expr(tokens)
+        right, tokens = parse_disj(tokens)
 
         if peek(tokens).type == '..':
             tokens.pop(0)
@@ -554,7 +625,7 @@ def parse_expr(tokens):
                 type = 'incr'
             else:
                 type = 'count'
-            step, tokens = parse_simple_expr(tokens)
+            step, tokens = parse_disj(tokens)
             left = [left, right]
             right = [step, type]
 
@@ -564,7 +635,53 @@ def parse_expr(tokens):
 
 
 @trace
-def parse_simple_expr(tokens):
+def parse_disj(tokens):
+    left, tokens = parse_conj(tokens)
+
+    while tokens and peek(tokens).type == 'or':
+        type = tokens.pop(0).type
+        right, tokens = parse_conj(tokens)
+        left = Expr(type, left, right)
+
+    return left, tokens
+
+
+@trace
+def parse_conj(tokens):
+    left, tokens = parse_neg(tokens)
+
+    while tokens and peek(tokens).type == 'and':
+        type = tokens.pop(0).type
+        right, tokens = parse_neg(tokens)
+        left = Expr(type, left, right)
+
+    return left, tokens
+
+
+@trace
+def parse_neg(tokens):
+    if peek(tokens).type == 'not':
+        tokens.pop(0)
+        left, tokens = parse_neg(tokens)
+        return Expr('not', left), tokens
+
+    return parse_comp(tokens)
+
+
+@trace
+def parse_comp(tokens):
+    left, tokens = parse_sum(tokens)
+
+    if peek(tokens).type in ['<', '>', '<=', '>=', '==', '!=']:
+        op = tokens.pop(0)
+        right, tokens = parse_sum(tokens)
+        left = Expr(op.type, left, right)
+
+    return left, tokens
+
+
+@trace
+def parse_sum(tokens):
     left, tokens = parse_term(tokens)
 
     while tokens and tokens[0].type in ['+', '-']:
@@ -573,6 +690,25 @@ def parse_simple_expr(tokens):
         left = Expr(type, left, right)
 
     return left, tokens
+
+
+@trace
+def parse_cases(tokens):
+    cases = []
+    lastcase, tokens = parse_stmnt(tokens)
+    while peek(tokens).type == 'if':
+        type = tokens.pop(0).type
+        cond, tokens = parse_expr(tokens)
+        case = Expr(type, lastcase, cond)
+        cases.append(case)
+        if peek(tokens).type != ';':
+            raise ParseError("expected ;")
+        tokens.pop(0)
+        lastcase, tokens = parse_stmnt(tokens)
+
+    cases = Expr('cases', cases, lastcase)
+
+    return cases, tokens
 
 
 @trace
@@ -647,10 +783,18 @@ def parse(tokens):
     #   | expr
     # param_list: 'identifier', { ',', identifier }
     # expr:
-    #   | simple_expr, [ '..', simple_expr, [ '..', ('+' | '-')?, simple_expr ] ]
-    # simple_expr:
+    #   | disj, '..', disj, [ '..', ('+' | '-')?, disj ]
+    #   | disj,
+    # disj: conj, { 'or', conj }
+    # conj: neg, { 'and', neg }
+    # neg:
+    #   | 'not', neg
+    #   | comp
+    # comp:
+    #   | sum, [ ( '<' | '>' | '<=' | '>=' | '==' | '!=' ), sum ]
+    # sum:
     #   | term, { '+' | '-', term }
-    # term: factor, { '*' | '/' | '%', factor }
+    # term: factor, { ( '*' | '/' | '%' ), factor }
     # factor:
     #   | '-', factor
     #   | atom, [ '^', factor ]
@@ -658,9 +802,11 @@ def parse(tokens):
     #   | 'identifier', [ '(', params?, ')' ]
     #   | '(', expr, ')'
     #   | '[', params?, ']'
+    #   | '{', cases, '}'
     #   | 'number'
     # params: expr, { ',', expr }
     # command_args: stmnt, { ',', stmnt }
+    # cases: { stmnt, 'if', expr, ';' }, stmnt
 
     roots, tokens = parse_stmnts(tokens)
 
@@ -712,6 +858,8 @@ def draw_tree(root, fname="tree"):
                     children = n.left + n.right
                 else:
                     children = [n.left, n.right]
+            elif n.type == 'cases':
+                children = n.left + [n.right]
             else:
                 children = [n.left, n.right]
 
@@ -774,7 +922,11 @@ def main(argv):
     try:
         _main(argv)
     except ExprError as e:
-        print(f'Error: {e}')
+        if TRACE:
+            import traceback
+            traceback.print_exception(e)
+        else:
+            print(f'Error: {e}')
         exit(1)
 
 
