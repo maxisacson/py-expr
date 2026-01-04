@@ -115,6 +115,9 @@ GLOBALS = {
 }
 
 
+END = { ';', 'eol' }
+
+
 def binop_reduce(op, context, left, right):
     if isinstance(left, Expr):
         return binop_reduce(op, context, left.eval(context), right)
@@ -432,6 +435,12 @@ def tokenize(s):
     tokens = []
 
     while len(s) > 0:
+        if s[0] == '\n':
+            s = s[1:]
+            if not tokens or tokens[-1].type != 'eol':
+                tokens.append(Token('eol', None))
+            continue
+
         if re.match(r'\s', s[0]):
             s = s[1:]
             continue
@@ -569,6 +578,8 @@ def parse_atom(tokens):
         return Expr('list', exprs), tokens
 
     if next.type == '{':
+        if peek(tokens).type == 'eol':
+            tokens.pop(0)
         cases, tokens = parse_cases(tokens)
         if peek(tokens).type != '}':
             raise ParseError('expected }')
@@ -701,10 +712,13 @@ def parse_cases(tokens):
         cond, tokens = parse_expr(tokens)
         case = Expr(type, lastcase, cond)
         cases.append(case)
-        if peek(tokens).type != ';':
-            raise ParseError("expected ;")
+        if peek(tokens).type not in END :
+            raise ParseError("expected ; or eol")
         tokens.pop(0)
         lastcase, tokens = parse_stmnt(tokens)
+
+    if peek(tokens).type in END:
+        tokens.pop(0)
 
     cases = Expr('cases', cases, lastcase)
 
@@ -763,19 +777,20 @@ def parse_stmnts(tokens):
     while tokens:
         s, tokens = parse_stmnt(tokens)
         stmnts.append(s)
-        if peek(tokens).type == ';':
+        if peek(tokens).type in END:
             tokens.pop(0)
         else:
             break
 
-    if peek(tokens).type == ';':
+    if peek(tokens).type == END:
         tokens.pop(0)
 
     return stmnts, tokens
 
 
 def parse(tokens):
-    # stmnts: stmnt, { ';', stmnt }, ';'?
+    # END: ';' | 'eol'
+    # stmnts: stmnt, { END, stmnt }, END?
     # stmnt:
     #   | 'command', command_args?
     #   | 'identifier', '=', expr
@@ -802,11 +817,11 @@ def parse(tokens):
     #   | 'identifier', [ '(', params?, ')' ]
     #   | '(', expr, ')'
     #   | '[', params?, ']'
-    #   | '{', cases, '}'
+    #   | '{', 'eol'?, cases, '}'
     #   | 'number'
     # params: expr, { ',', expr }
     # command_args: stmnt, { ',', stmnt }
-    # cases: { stmnt, 'if', expr, ';' }, stmnt
+    # cases: { stmnt, 'if', expr, END }, stmnt, END?
 
     roots, tokens = parse_stmnts(tokens)
 
@@ -884,18 +899,20 @@ def parse_expression(s):
 def _main(argv):
     if len(argv) < 2:
         program = []
-        for line in sys.stdin:
-            exprs = parse_expression(line)
 
-            if sys.stdin.isatty():
+        if sys.stdin.isatty():
+            for line in sys.stdin:
+                exprs = parse_expression(line)
+                result = None
                 for expr in exprs:
                     result = expr.eval()
-                    if result is not None:
-                        GLOBALS['_'] = result
-                        GLOBALS['ans'] = result
-                        print('=', result)
-            else:
-                program += exprs
+                if result is not None:
+                    GLOBALS['_'] = result
+                    GLOBALS['ans'] = result
+                    print('=', result)
+        else:
+            input = sys.stdin.read()
+            program = parse_expression(input)
     else:
         assignments = []
         expressions = []
@@ -911,7 +928,6 @@ def _main(argv):
 
     result = None
     for expr in program:
-        draw_tree(expr)
         result = expr.eval()
 
     if result is not None:
