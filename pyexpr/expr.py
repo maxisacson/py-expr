@@ -14,7 +14,7 @@ def _table(context, *args):
             cols.append([y])
 
         n = len(cols[-1])
-        if rows > 0 and n != rows and n != 1:
+        if rows > 1 and n != rows and n != 1:
             raise EvalError("print: arguments have to be either size 1 or size N")
 
         rows = max(rows, n)
