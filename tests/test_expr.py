@@ -1,5 +1,7 @@
 import pytest
-from pyexpr import parse_expression
+import sys
+
+from pyexpr.__main__ import parse_expression
 
 TEST_DATA = [
     ('1+2*3', 7),
