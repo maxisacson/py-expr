@@ -208,7 +208,7 @@ class Expr:
             value = self.right._eval(context)
             GLOBALS[vname] = value
 
-            return None
+            return value
 
         elif self.type == ":=":
             fname = self.left.left
