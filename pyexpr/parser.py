@@ -35,8 +35,9 @@ def parse_command_args(tokens):
     while tokens:
         p, tokens = parse_stmnt(tokens)
         args.append(p)
-        if peek(tokens).type in END:
+        if peek(tokens).type == ',':
             tokens.pop(0)
+        elif peek(tokens).type in END:
             break
 
     return args, tokens
@@ -351,7 +352,7 @@ def parse(tokens):
     #   | '{', 'eol'?, cases, '}'
     #   | 'number'
     # params: expr, { ',', expr }
-    # command_args: stmnt, { stmnt }
+    # command_args: stmnt, { ','?, stmnt }
     # cases: { stmnt, 'if', expr, END }, stmnt, END?
 
     roots, tokens = parse_stmnts(tokens)
