@@ -41,10 +41,40 @@ def _ast(_, *args):
     subprocess.run(["xdg-open", "ast.svg"])
 
 
+def _sum(context, *args):
+    if len(args) == 1:
+        expr, = args
+    else:
+        init, expr, = args
+        init.eval(context)
+
+    v = expr.eval(context)
+
+    if isinstance(v, list):
+        return sum(v)
+    return v
+
+
+def _prod(context, *args):
+    if len(args) == 1:
+        expr, = args
+    else:
+        init, expr, = args
+        init.eval(context)
+
+    v = expr.eval(context)
+
+    if isinstance(v, list):
+        return math.prod(v)
+    return v
+
+
 COMMANDS = {
     'print': _print,
     'table': _table,
     'ast': _ast,
+    'sum': _sum,
+    'prod': _prod,
 }
 
 KEYWORDS = {
