@@ -302,7 +302,19 @@ class Expr:
         elif self.type == 'not':
             return not self.left._eval(context)
 
-        raise EvalError(f"unknown expression type: {self.type}")
+        elif self.type == 'idx':
+            vname = self.left
+            idx = self.right._eval(context)
+
+            if vname in context:
+                value = context[vname][idx]
+            else:
+                value = GLOBALS[vname][idx]
+
+            return value
+
+        else:
+            raise EvalError(f"unknown expression type: {self.type}")
 
     def __repr__(self):
         return f"Expr({self.type}, {self.left}, {self.right})"
@@ -336,6 +348,9 @@ def draw_tree(root, fname="tree"):
                     else:
                         f.write(f'v{n.id}[label="{n.type}"];\n')
 
+                elif n.type == 'idx':
+                    f.write(f'v{n.id}[label="{n.left}[]"];\n')
+
                 else:
                     f.write(f'v{n.id}[label="{n.type}"];\n')
 
@@ -352,6 +367,8 @@ def draw_tree(root, fname="tree"):
                     children = [n.left, n.right]
             elif n.type == 'cases':
                 children = n.left + [n.right]
+            elif n.type == 'idx':
+                children = [n.right]
             else:
                 children = [n.left, n.right]
 

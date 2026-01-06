@@ -64,20 +64,31 @@ def parse_atom(tokens):
     next = tokens.pop(0)
 
     if next.type == 'identifier':
-        if peek(tokens).type != '(':
-            return Expr('var', next.value), tokens
-
-        tokens.pop(0)
-        if peek(tokens).type == ')':
+        if peek(tokens).type == '(':
             tokens.pop(0)
-            return Expr('fcall', next.value, []), tokens
+            if peek(tokens).type == ')':
+                tokens.pop(0)
+                return Expr('fcall', next.value, []), tokens
 
-        params, tokens = parse_params(tokens)
-        t = tokens.pop(0)
-        if t.type != ')':
-            raise ParseError(f"expected ) but found {t.type}")
+            params, tokens = parse_params(tokens)
+            t = tokens.pop(0)
+            if t.type != ')':
+                raise ParseError(f"expected ) but found {t.type}")
 
-        return Expr('fcall', next.value, params), tokens
+            return Expr('fcall', next.value, params), tokens
+
+        if peek(tokens).type == '[':
+            tokens.pop(0)
+            expr, tokens = parse_expr(tokens)
+
+            if peek(tokens).type == ']':
+                tokens.pop(0)
+            else:
+                raise ParseError("expected closing ]")
+
+            return Expr('idx', next.value, expr), tokens
+
+        return Expr('var', next.value), tokens
 
     if next.type == '(':
         expr, tokens = parse_expr(tokens)
@@ -92,7 +103,7 @@ def parse_atom(tokens):
     if next.type == '[':
         exprs, tokens = parse_params(tokens)
         if peek(tokens).type != ']':
-            raise ParseError('expected ]')
+            raise ParseError('expected closing ]')
         tokens.pop(0)
         return Expr('list', exprs), tokens
 
@@ -334,6 +345,7 @@ def parse(tokens):
     #   | atom, [ '^', factor ]
     # atom:
     #   | 'identifier', [ '(', params?, ')' ]
+    #   | 'identifier', [ '[', expr, ']' ]
     #   | '(', expr, ')'
     #   | '[', params?, ']'
     #   | '{', 'eol'?, cases, '}'
