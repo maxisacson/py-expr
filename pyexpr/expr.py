@@ -86,6 +86,7 @@ KEYWORDS = {
 
 
 GLOBALS = {
+    'nil': None,
     'sin': math.sin,
     'cos': math.cos,
     'tan': math.tan,
@@ -170,6 +171,12 @@ class Expr:
         if self.type is None:
             return self.left._eval(context)
 
+        elif self.type == 'stmnts':
+            result = None
+            for s in self.left:
+                result = s._eval(context)
+            return result
+
         elif self.type == 'literal':
             return self.left
 
@@ -236,7 +243,10 @@ class Expr:
         elif self.type == '=':
             vname = self.left.left
             value = self.right._eval(context)
-            GLOBALS[vname] = value
+            if vname in context:
+                context[vname] = value
+            else:
+                GLOBALS[vname] = value
 
             return value
 
@@ -399,6 +409,8 @@ def draw_tree(root, fname="tree"):
                 children = n.left + [n.right]
             elif n.type == 'idx':
                 children = [n.right]
+            elif n.type == 'stmnts':
+                children = n.left
             else:
                 children = [n.left, n.right]
 

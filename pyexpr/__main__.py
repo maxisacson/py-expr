@@ -9,44 +9,31 @@ from .common import TRACE, ExprError
 
 def parse_expression(s):
     tokens = tokenize(s)
-    expr = parse(tokens)
-    return expr
+    root = parse(tokens)
+    return root
 
 
 def _main(argv):
     if len(argv) < 2:
-        program = []
-
         if sys.stdin.isatty():
             for line in sys.stdin:
-                exprs = parse_expression(line)
-                result = None
-                for expr in exprs:
-                    result = expr.eval()
+                expr = parse_expression(line)
+                result = expr.eval()
                 if result is not None:
                     GLOBALS['_'] = result
                     GLOBALS['ans'] = result
                     print('=', result)
-        else:
-            input = sys.stdin.read()
-            program = parse_expression(input)
+            return
+
+        input = sys.stdin.read()
+    elif argv[1] == 'file':
+        with open(argv[2]) as f:
+            input = f.read()
     else:
-        assignments = []
-        expressions = []
+        input = '\n'.join(argv[1:])
 
-        for e in argv[1:]:
-            exprs = parse_expression(e)
-            if len(exprs) == 1 and exprs[0].type == '=':
-                assignments += exprs
-            else:
-                expressions += exprs
-
-        program = assignments + expressions
-
-    result = None
-    for expr in program:
-        result = expr.eval()
-
+    program = parse_expression(input)
+    result = program.eval()
     if result is not None:
         print(result)
 

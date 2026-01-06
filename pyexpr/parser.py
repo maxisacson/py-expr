@@ -258,7 +258,31 @@ def parse_cases(tokens):
 
 @trace
 def parse_stmnt(tokens):
-    if peek(tokens).type == 'command':
+    if peek(tokens).type == '{':
+        tokens.pop(0)
+        if peek(tokens).type == 'eol':
+            tokens.pop(0)
+
+        stmnts = []
+        while tokens:
+            s, tokens = parse_stmnt(tokens)
+            stmnts.append(s)
+
+            if peek(tokens).type in END:
+                tokens.pop(0)
+            else:
+                break
+
+            if peek(tokens).type == '}':
+                break
+
+        if peek(tokens).type != '}':
+            raise ParseError("expected closing }")
+        tokens.pop(0)
+
+        return Expr('stmnts', stmnts), tokens
+
+    elif peek(tokens).type == 'command':
         left = tokens.pop(0)
         next = peek(tokens)
         if next.type is None or next.type == ';':
@@ -316,13 +340,14 @@ def parse_stmnts(tokens):
     if peek(tokens).type == END:
         tokens.pop(0)
 
-    return stmnts, tokens
+    return Expr('stmnts', stmnts), tokens
 
 
 def parse(tokens):
     # END: ';' | 'eol'
     # stmnts: stmnt, { END, stmnt }, END?
     # stmnt:
+    #   | '{', 'eol'?, stmnt, { END, stmnt }, END?, '}'
     #   | 'command', command_args?
     #   | 'identifier', '=', expr
     #   | 'identifier', ':', param_list?, '=', expr
@@ -355,11 +380,11 @@ def parse(tokens):
     # command_args: stmnt, { ','?, stmnt }
     # cases: { stmnt, 'if', expr, END }, stmnt, END?
 
-    roots, tokens = parse_stmnts(tokens)
+    root, tokens = parse_stmnts(tokens)
 
     if tokens:
         raise ParseError(f"unexpected tokens: {tokens[0]}")
 
-    return roots
+    return root
 
 
