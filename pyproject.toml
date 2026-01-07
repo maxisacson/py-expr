@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pyexpr"
+name = "nanocalc"
 version = "0.1.0"
 authors = [ { name="Max Isacson" } ]
 readme = "README.md"
@@ -11,8 +11,8 @@ license = "MIT"
 license-files = ["LICENSE"]
 
 [project.urls]
-Homepage = "https://github.com/maxisacson/py-expr"
-Issues = "https://github.com/maxisacson/py-expr/issues"
+Homepage = "https://github.com/maxisacson/nanocalc-py"
+Issues = "https://github.com/maxisacson/nanocalc-py/issues"
 
 [project.scripts]
-pyexpr = "pyexpr.__main__:main"
+nc = "nanocalc.__main__:main"
