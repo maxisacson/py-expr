@@ -117,6 +117,10 @@ def parse_atom(tokens):
         tokens.pop(0)
         return cases, tokens
 
+    if next.type == '#':
+        atom, tokens = parse_atom(tokens)
+        return Expr('#', atom), tokens
+
     if next.type == 'number':
         return Expr('literal', next.value), tokens
 
@@ -388,6 +392,7 @@ def parse(tokens):
     #   | '(', expr, ')'
     #   | '[', params?, ']'
     #   | '{', 'eol'?, cases, '}'
+    #   | '#', atom
     #   | 'number'
     #   | 'string'
     # params: expr, { ',', expr }

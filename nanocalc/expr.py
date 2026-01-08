@@ -367,7 +367,9 @@ class Expr:
 
             return result
 
-
+        elif self.type == '#':
+            value = self.left._eval(context)
+            return len(value)
 
         else:
             raise EvalError(f"unknown expression type: {self.type}")

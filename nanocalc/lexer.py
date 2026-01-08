@@ -114,7 +114,7 @@ def tokenize(s):
                 s = s[1:]
                 continue
 
-        if re.match(r'[-+*/^%,\(\):;\[\]\{\}]', s[0]):
+        if re.match(r'[-+*/^%,\(\):;\[\]\{\}#]', s[0]):
             t, s = s[0], s[1:]
             tokens.append(Token(t, None))
             continue
