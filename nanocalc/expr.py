@@ -82,6 +82,8 @@ KEYWORDS = {
     'and',
     'or',
     'not',
+    'for',
+    'in',
 }
 
 
@@ -347,9 +349,9 @@ class Expr:
             idx = self.right._eval(context)
 
             if vname in context:
-                value = context[vname][idx]
+                value = context[vname][idx-1]
             else:
-                value = GLOBALS[vname][idx]
+                value = GLOBALS[vname][idx-1]
 
             return value
 
@@ -370,6 +372,24 @@ class Expr:
         elif self.type == '#':
             value = self.left._eval(context)
             return len(value)
+
+        elif self.type == 'for':
+            var, expr = self.left
+            vname = var.left
+            body = self.right
+
+            if vname in context:
+                ctx = context
+            else:
+                ctx = GLOBALS
+
+            values = expr._eval(context)
+            for value in values:
+                ctx[vname] = value
+                body._eval(context)
+
+            return None
+
 
         else:
             raise EvalError(f"unknown expression type: {self.type}")
@@ -431,6 +451,8 @@ def draw_tree(root, fname="tree"):
                 children = n.left
             elif n.type == 'lchain':
                 children = [n.left] + n.right
+            elif n.type == 'for':
+                children = n.left + [n.right]
             else:
                 children = [n.left, n.right]
 

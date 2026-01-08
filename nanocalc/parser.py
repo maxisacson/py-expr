@@ -299,6 +299,26 @@ def parse_stmnt(tokens):
 
         return Expr('stmnts', stmnts), tokens
 
+    elif peek(tokens).type == 'for':
+        tokens.pop(0)
+
+        if peek(tokens).type != 'identifier':
+            raise ParseError("expected identifier")
+        ident = Expr('var', tokens.pop(0).value)
+
+        if peek(tokens).type != 'in':
+            raise ParseError("expected 'in'")
+        tokens.pop(0)
+
+        expr, tokens = parse_expr(tokens)
+
+        if peek(tokens).type == 'eol':
+            tokens.pop(0)
+
+        body, tokens = parse_stmnt(tokens)
+
+        return Expr('for', [ident, expr], body), tokens
+
     elif peek(tokens).type == 'command':
         left = tokens.pop(0)
         next = peek(tokens)
@@ -365,6 +385,7 @@ def parse(tokens):
     # stmnts: stmnt, { END, stmnt }, END?
     # stmnt:
     #   | '{', 'eol'?, stmnt, { END, stmnt }, END?, '}'
+    #   | 'for', 'identifier', 'in', expr, 'eol'?, stmnt
     #   | 'command', command_args?
     #   | 'identifier', '=', expr
     #   | 'identifier', ':', param_list?, '=', expr
