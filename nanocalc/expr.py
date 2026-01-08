@@ -353,6 +353,22 @@ class Expr:
 
             return value
 
+        elif self.type == 'lchain':
+            lhs = self.left
+
+            result = True
+
+            left = lhs._eval(context)
+            for rhs in self.right:
+                right = rhs.left._eval(context)
+                expr = Expr(rhs.type, left, right)
+                result = result and expr._eval(context)
+                left = right
+
+            return result
+
+
+
         else:
             raise EvalError(f"unknown expression type: {self.type}")
 
@@ -411,6 +427,8 @@ def draw_tree(root, fname="tree"):
                 children = [n.right]
             elif n.type == 'stmnts':
                 children = n.left
+            elif n.type == 'lchain':
+                children = [n.left] + n.right
             else:
                 children = [n.left, n.right]
 

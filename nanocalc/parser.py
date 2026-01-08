@@ -213,13 +213,22 @@ def parse_neg(tokens):
 @trace
 def parse_comp(tokens):
     left, tokens = parse_sum(tokens)
-
-    if peek(tokens).type in ['<', '>', '<=', '>=', '==', '!=']:
+    exprs = []
+    while peek(tokens).type in ['<', '>', '<=', '>=', '==', '!=']:
         op = tokens.pop(0)
         right, tokens = parse_sum(tokens)
-        left = Expr(op.type, left, right)
+        expr = Expr(op.type, right)
+        exprs.append(expr)
 
-    return left, tokens
+    if len(exprs) < 1:
+        return left, tokens
+    elif len(exprs) == 1:
+        expr, = exprs
+        return Expr(expr.type, left, expr.left), tokens
+
+    root = Expr('lchain', left, exprs)
+
+    return root, tokens
 
 
 @trace
@@ -362,7 +371,7 @@ def parse(tokens):
     #   | 'not', neg
     #   | comp
     # comp:
-    #   | sum, [ ( '<' | '>' | '<=' | '>=' | '==' | '!=' ), sum ]
+    #   | sum, { ( '<' | '>' | '<=' | '>=' | '==' | '!=' ), sum }
     # sum:
     #   | term, { '+' | '-', term }
     # term: factor, { ( '*' | '/' | '%' ), factor }
