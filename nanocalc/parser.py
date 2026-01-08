@@ -117,10 +117,14 @@ def parse_atom(tokens):
         tokens.pop(0)
         return cases, tokens
 
-    if next.type != 'number':
-        raise ParseError("expected number")
+    if next.type == 'number':
+        return Expr('literal', next.value), tokens
 
-    return Expr('literal', next.value), tokens
+    if next.type == 'string':
+        return Expr('literal', next.value), tokens
+
+    raise ParseError(f"unexpected token: {next.type}")
+
 
 
 @trace
@@ -385,6 +389,7 @@ def parse(tokens):
     #   | '[', params?, ']'
     #   | '{', 'eol'?, cases, '}'
     #   | 'number'
+    #   | 'string'
     # params: expr, { ',', expr }
     # command_args: stmnt, { ','?, stmnt }
     # cases: { stmnt, 'if', expr, END }, stmnt, END?

@@ -76,6 +76,24 @@ def tok_range(s):
     return Token('..', token), s
 
 
+def tok_string(s):
+    token = ''
+
+    t, s = s[0], s[1:]
+    if t != '"':
+        raise TokenError(f"unexpected token: {t}")
+
+    while len(s) > 0 and s[0] != '"':
+        t, s = s[0], s[1:]
+        token += t
+
+    t, s = s[0], s[1:]
+    if t != '"':
+        raise TokenError(f"unexpected token: {t}")
+
+    return Token('string', token), s
+
+
 @trace
 def tokenize(s):
     tokens = []
@@ -124,6 +142,11 @@ def tokenize(s):
                 token, s = tok_range(s)
             else:
                 token, s = tok_number("0" + s)
+            tokens.append(token)
+            continue
+
+        if s[0] == '"':
+            token, s = tok_string(s)
             tokens.append(token)
             continue
 
