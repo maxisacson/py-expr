@@ -62,9 +62,10 @@ def parse_param_list(tokens):
 
 @trace
 def parse_atom(tokens):
-    next = tokens.pop(0)
+    next = peek(tokens)
 
     if next.type == 'identifier':
+        tokens.pop(0)
         if peek(tokens).type == '(':
             tokens.pop(0)
             if peek(tokens).type == ')':
@@ -92,6 +93,7 @@ def parse_atom(tokens):
         return Expr('var', next.value), tokens
 
     if next.type == '(':
+        tokens.pop(0)
         expr, tokens = parse_expr(tokens)
 
         if peek(tokens).type == ')':
@@ -102,6 +104,7 @@ def parse_atom(tokens):
         return expr, tokens
 
     if next.type == '[':
+        tokens.pop(0)
         exprs, tokens = parse_params(tokens)
         if peek(tokens).type != ']':
             raise ParseError('expected closing ]')
@@ -109,22 +112,19 @@ def parse_atom(tokens):
         return Expr('list', exprs), tokens
 
     if next.type == '{':
-        if peek(tokens).type == 'eol':
-            tokens.pop(0)
-        cases, tokens = parse_cases(tokens)
-        if peek(tokens).type != '}':
-            raise ParseError('expected }')
-        tokens.pop(0)
-        return cases, tokens
+        return parse_block(tokens)
 
     if next.type == '#':
+        tokens.pop(0)
         atom, tokens = parse_atom(tokens)
         return Expr('#', atom), tokens
 
     if next.type == 'number':
+        next = tokens.pop(0)
         return Expr('literal', next.value), tokens
 
     if next.type == 'string':
+        next = tokens.pop(0)
         return Expr('literal', next.value), tokens
 
     raise ParseError(f"unexpected token: {next.type}")
@@ -252,54 +252,56 @@ def parse_sum(tokens):
 
 
 @trace
-def parse_cases(tokens):
-    cases = []
+def parse_block(tokens):
+    if peek(tokens).type != '{':
+        raise ParseError("expected {")
+    tokens.pop(0)
+
+    while peek(tokens).type == 'eol':
+        tokens.pop(0)
+
     lastcase, tokens = parse_stmnt(tokens)
-    while peek(tokens).type == 'if':
-        type = tokens.pop(0).type
-        cond, tokens = parse_expr(tokens)
-        case = Expr(type, lastcase, cond)
-        cases.append(case)
-        if peek(tokens).type not in END :
-            raise ParseError("expected ; or eol")
-        tokens.pop(0)
-        lastcase, tokens = parse_stmnt(tokens)
 
-    if peek(tokens).type in END:
-        tokens.pop(0)
+    if peek(tokens).type == 'if':
+        cases = []
+        while peek(tokens).type == 'if':
+            type = tokens.pop(0).type
+            cond, tokens = parse_expr(tokens)
+            case = Expr(type, lastcase, cond)
+            cases.append(case)
+            if peek(tokens).type not in END :
+                raise ParseError("expected ; or eol")
+            tokens.pop(0)
+            lastcase, tokens = parse_stmnt(tokens)
 
-    cases = Expr('cases', cases, lastcase)
+        if peek(tokens).type in END:
+            tokens.pop(0)
 
-    return cases, tokens
+        block = Expr('cases', cases, lastcase)
+
+    else:
+        stmnts = [lastcase]
+        while peek(tokens).type in END:
+            tokens.pop(0)
+            if peek(tokens).type == '}':
+                break
+
+            stmnt, tokens = parse_stmnt(tokens)
+            stmnts.append(stmnt)
+
+        block = Expr('block', stmnts)
+
+    if peek(tokens).type != '}':
+        raise ParseError('expected }')
+    tokens.pop(0)
+
+    return block, tokens
+
 
 
 @trace
 def parse_stmnt(tokens):
-    if peek(tokens).type == '{':
-        tokens.pop(0)
-        if peek(tokens).type == 'eol':
-            tokens.pop(0)
-
-        stmnts = []
-        while tokens:
-            s, tokens = parse_stmnt(tokens)
-            stmnts.append(s)
-
-            if peek(tokens).type in END:
-                tokens.pop(0)
-            else:
-                break
-
-            if peek(tokens).type == '}':
-                break
-
-        if peek(tokens).type != '}':
-            raise ParseError("expected closing }")
-        tokens.pop(0)
-
-        return Expr('stmnts', stmnts), tokens
-
-    elif peek(tokens).type == 'for':
+    if peek(tokens).type == 'for':
         tokens.pop(0)
 
         if peek(tokens).type != 'identifier':
@@ -384,7 +386,6 @@ def parse(tokens):
     # END: ';' | 'eol'
     # stmnts: stmnt, { END, stmnt }, END?
     # stmnt:
-    #   | '{', 'eol'?, stmnt, { END, stmnt }, END?, '}'
     #   | 'for', 'identifier', 'in', expr, 'eol'?, stmnt
     #   | 'command', command_args?
     #   | 'identifier', '=', expr
@@ -412,13 +413,15 @@ def parse(tokens):
     #   | 'identifier', [ '[', expr, ']' ]
     #   | '(', expr, ')'
     #   | '[', params?, ']'
-    #   | '{', 'eol'?, cases, '}'
     #   | '#', atom
     #   | 'number'
     #   | 'string'
+    #   | block
     # params: expr, { ',', expr }
     # command_args: stmnt, { ','?, stmnt }
-    # cases: { stmnt, 'if', expr, END }, stmnt, END?
+    # block:
+    #   | '{', 'eol'?, stmnt, { 'if', expr, END, stmnt }, END?, '}'
+    #   | '{', 'eol'?, stmnt, { END, stmnt }, END?, '}'
 
     root, tokens = parse_stmnts(tokens)
 

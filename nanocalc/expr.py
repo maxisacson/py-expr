@@ -173,7 +173,7 @@ class Expr:
         if self.type is None:
             return self.left._eval(context)
 
-        elif self.type == 'stmnts':
+        elif self.type == 'stmnts' or self.type == 'block':
             result = None
             for s in self.left:
                 result = s._eval(context)
@@ -448,6 +448,8 @@ def draw_tree(root, fname="tree"):
             elif n.type == 'idx':
                 children = [n.right]
             elif n.type == 'stmnts':
+                children = n.left
+            elif n.type == 'block':
                 children = n.left
             elif n.type == 'lchain':
                 children = [n.left] + n.right
