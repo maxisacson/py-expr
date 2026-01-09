@@ -96,6 +96,16 @@ def tok_string(s):
 
 @trace
 def tokenize(s):
+    # 'space': \s -> skip
+    # 'eol': \n
+    # \0:
+    #   | [<>=!]=?
+    #   | [-+*/^%,\(\):;\[\]\{\}#]
+    # 'number':
+    #   | [0-9]+\.?[0-9]*([eE]-?)[0-9]*
+    #   | \.[0-9]*([eE]-?)[0-9]*
+    # 'string': (?<=").*(?=")
+
     tokens = []
 
     while len(s) > 0:
