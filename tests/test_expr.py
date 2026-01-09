@@ -1,7 +1,7 @@
 import pytest
 import sys
 
-from pyexpr.__main__ import parse_expression
+from nanocalc.__main__ import parse_expression
 
 TEST_DATA = [
     ('1+2*3', 7),
@@ -120,7 +120,7 @@ TEST_DATA = [
 
 @pytest.mark.parametrize("expression, expected", TEST_DATA)
 def test_expr(expression, expected):
-    e, = parse_expression(expression)
+    e = parse_expression(expression)
     actual = e.eval()
 
     assert actual == expected
