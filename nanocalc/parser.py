@@ -382,8 +382,22 @@ def parse_stmnts(tokens):
     return Expr('stmnts', stmnts), tokens
 
 
+@trace
+def parse_program(tokens):
+    while peek(tokens).type == 'eol':
+        tokens.pop(0)
+
+    stmnts, tokens = parse_stmnts(tokens)
+
+    while peek(tokens).type == 'eol':
+        tokens.pop(0)
+
+    return stmnts, tokens
+
+
 def parse(tokens):
     # END: ';' | 'eol'
+    # program: 'eol'*, stmnts, 'eol'*
     # stmnts: stmnt, { END, stmnt }, END?
     # stmnt:
     #   | 'for', 'identifier', 'in', expr, 'eol'?, stmnt
@@ -424,7 +438,7 @@ def parse(tokens):
     #   | '{', 'eol'?, stmnt, { 'if', expr, END, stmnt }, END?, '}'
     #   | '{', 'eol'?, stmnt, { END, stmnt }, END?, '}'
 
-    root, tokens = parse_stmnts(tokens)
+    root, tokens = parse_program(tokens)
 
     if tokens:
         raise ParseError(f"unexpected tokens: {tokens[0]}")
