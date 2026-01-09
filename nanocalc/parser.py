@@ -14,18 +14,18 @@ def peek(tokens, offset=0):
 
 
 @trace
-def parse_params(tokens):
-    params = []
+def parse_items(tokens):
+    items = []
 
     while True:
-        p, tokens = parse_expr(tokens)
-        params.append(p)
+        e, tokens = parse_expr(tokens)
+        items.append(e)
         if peek(tokens).type == ',':
             tokens.pop(0)
         else:
             break
 
-    return params, tokens
+    return items, tokens
 
 
 @trace
@@ -72,7 +72,7 @@ def parse_atom(tokens):
                 tokens.pop(0)
                 return Expr('fcall', next.value, []), tokens
 
-            params, tokens = parse_params(tokens)
+            params, tokens = parse_items(tokens)
             t = tokens.pop(0)
             if t.type != ')':
                 raise ParseError(f"expected ) but found {t.type}")
@@ -105,7 +105,7 @@ def parse_atom(tokens):
 
     if next.type == '[':
         tokens.pop(0)
-        exprs, tokens = parse_params(tokens)
+        exprs, tokens = parse_items(tokens)
         if peek(tokens).type != ']':
             raise ParseError('expected closing ]')
         tokens.pop(0)
@@ -409,15 +409,16 @@ def parse(tokens):
     #   | '-', factor
     #   | atom, [ '^', factor ]
     # atom:
-    #   | 'identifier', [ '(', params?, ')' ]
-    #   | 'identifier', [ '[', expr, ']' ]
+    #   | 'identifier', '(', items?, ')'
+    #   | 'identifier', '[', expr, ']'
+    #   | 'identifier'
     #   | '(', expr, ')'
-    #   | '[', params?, ']'
+    #   | '[', items?, ']'
     #   | '#', atom
     #   | 'number'
     #   | 'string'
     #   | block
-    # params: expr, { ',', expr }
+    # items: expr, { ',', expr }
     # command_args: stmnt, { ','?, stmnt }
     # block:
     #   | '{', 'eol'?, stmnt, { 'if', expr, END, stmnt }, END?, '}'
