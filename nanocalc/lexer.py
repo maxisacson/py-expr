@@ -76,28 +76,33 @@ def tok_range(s):
     return Token('..', token), s
 
 
-def tok_string(s):
+def tok_string_or_comment(s):
     token = ''
 
     t, s = s[0], s[1:]
     if t != '"':
         raise TokenError(f"unexpected token: {t}")
 
-    while len(s) > 0 and s[0] != '"':
+    while len(s) > 0 and not re.match(r'["\n]', s[0]):
         t, s = s[0], s[1:]
         token += t
 
     t, s = s[0], s[1:]
-    if t != '"':
-        raise TokenError(f"unexpected token: {t}")
 
-    return Token('string', token), s
+    if t == '"':
+        return Token('string', token), s
+    elif t == '\n':
+        return Token('comment', token), s
+
+    raise TokenError(f"unexpected token: {t}")
+
 
 
 @trace
 def tokenize(s):
     # 'space': \s -> skip
     # 'eol': \n
+    # 'comment': "[^"]*$
     # \0:
     #   | [<>=!]=?
     #   | [-+*/^%,\(\):;\[\]\{\}#]
@@ -156,8 +161,9 @@ def tokenize(s):
             continue
 
         if s[0] == '"':
-            token, s = tok_string(s)
-            tokens.append(token)
+            token, s = tok_string_or_comment(s)
+            if token.type == 'string':
+                tokens.append(token)
             continue
 
         raise TokenError(f"unexpected token: {s[0]}")
