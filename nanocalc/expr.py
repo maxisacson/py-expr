@@ -327,13 +327,12 @@ class Expr:
 
         elif self.type == 'cases':
             cases = self.left
-            lastcase = self.right
             for x in cases:
                 result = x._eval(context)
                 if result is not None:
                     return result
 
-            return lastcase._eval(context)
+            return None
 
         elif self.type == 'or':
             return self.left._eval(context) or self.right._eval(context)
