@@ -24,13 +24,11 @@ conj: neg, { 'and', neg }
 neg:
   | 'not', neg
   | comp
-comp:
-  | sum, { ( '<' | '>' | '<=' | '>=' | '==' | '!=' ), sum }
-sum:
-  | term, { '+' | '-', term }
-term: factor, { ( '*' | '/' | '%' ), factor }
+comp: sum, { '<' | '>' | '<=' | '>=' | '==' | '!=', sum }
+sum: term, { '+' | '-', term }
+term: factor, { '*' | '/' | '%', factor }
 factor:
-  | '-', factor
+  | '-' | '#', factor
   | atom, [ '^', factor ]
 atom:
   | 'identifier', '(', items?, ')'
@@ -38,14 +36,12 @@ atom:
   | 'identifier'
   | '(', expr, ')'
   | '[', items?, ']'
-  | '#', atom
   | 'number'
   | 'string'
   | block
 items: expr, { ',', expr }
 command_args: stmnt, { ','?, stmnt }
-block:
-  | '{', 'eol'?, stmnts?, '}'
+block: '{', 'eol'?, stmnts?, '}'
 """
 
 
@@ -175,11 +171,6 @@ def parse_atom(tokens):
         tokens.pop(0)
         return Expr('list', exprs), tokens
 
-    if next.type == '#':
-        tokens.pop(0)
-        atom, tokens = parse_atom(tokens)
-        return Expr('#', atom), tokens
-
     if next.type == 'number':
         next = tokens.pop(0)
         return Expr('literal', next.value), tokens
@@ -197,10 +188,10 @@ def parse_atom(tokens):
 
 @trace
 def parse_factor(tokens):
-    if peek(tokens).type == '-':
-        tokens = tokens[1:]
+    if peek(tokens).type in ['-', '#']:
+        op = tokens.pop(0).type
         left, tokens = parse_factor(tokens)
-        return Expr('-', left), tokens
+        return Expr(op, left), tokens
 
     left, tokens = parse_atom(tokens)
 

@@ -221,6 +221,10 @@ class Expr:
         elif self.type == '!=':
             return binop_reduce(lambda x, y: x != y, context, self.left, self.right)
 
+        elif self.type == '#':
+            value = self.left._eval(context)
+            return len(value)
+
         elif self.type == 'fcall':
             fname = self.left
             params = self.right
@@ -367,10 +371,6 @@ class Expr:
                 left = right
 
             return result
-
-        elif self.type == '#':
-            value = self.left._eval(context)
-            return len(value)
 
         elif self.type == 'for':
             var, expr = self.left
