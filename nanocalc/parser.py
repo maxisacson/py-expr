@@ -9,16 +9,18 @@ program: 'eol'*, stmnts?, 'eol'*
 stmnts: stmnt, { END, stmnt }, END?
 stmnt:
   | 'for', 'identifier', 'in', expr, 'eol'?, stmnt
-  | 'command', command_args?
+  | 'command', command_args
   | simple_stmnt, [ 'if', expr, END ]
 simple_stmnt:
-  | 'identifier', '=', expr
-  | 'identifier', ':', param_list?, '=', expr
+  | 'identifier', simple_stmnt_tail
   | expr
+simple_stmnt_tail:
+  | '=', expr
+  | ':', param_list?, '=', expr
 param_list: 'identifier', { ',', identifier }
-expr:
-  | disj, '..', disj, [ '..', ('+' | '-')?, disj ]
-  | disj,
+expr: disj, expr_tail?
+expr_tail: '..', disj, range_tail?
+range_tail: '..', ('+' | '-')?, disj
 disj: conj, { 'or', conj }
 conj: neg, { 'and', neg }
 neg:
@@ -28,20 +30,21 @@ comp: sum, { '<' | '>' | '<=' | '>=' | '==' | '!=', sum }
 sum: term, { '+' | '-', term }
 term: factor, { '*' | '/' | '%', factor }
 factor:
-  | '-' | '#', factor
+  | ('-' | '#'), factor
   | atom, [ '^', factor ]
 atom:
-  | 'identifier', '(', items?, ')'
-  | 'identifier', '[', expr, ']'
-  | 'identifier'
+  | 'identifier', atom_ident_tail?
   | '(', expr, ')'
   | '[', items?, ']'
   | 'number'
   | 'string'
   | block
+atom_ident_tail:
+  | '(', items?, ')'
+  | '[', expr, ']'
 items: expr, { ',', expr }
-command_args: stmnt, { ','?, stmnt }
-block: '{', 'eol'?, stmnts?, '}'
+command_args: stmnt*
+block: '{', 'eol'*, stmnts?, 'eol'*, '}'
 """
 
 
@@ -57,6 +60,7 @@ FIRST_disj = FIRST_conj
 FIRST_expr = FIRST_disj
 FIRST_param_list = {'identifier'}
 FIRST_simple_stmnt = {'identifier'} | FIRST_expr
+FIRST_simple_stmnt_tail = { '=', ':' }
 FIRST_stmnt = {'for', 'command'} | FIRST_simple_stmnt
 FIRST_stmnts = FIRST_stmnt
 FIRST_program = {'eol'} | FIRST_stmnts
@@ -92,13 +96,9 @@ def parse_items(tokens):
 def parse_command_args(tokens):
     args = []
 
-    while tokens:
-        p, tokens = parse_stmnt(tokens)
-        args.append(p)
-        if peek(tokens).type == ',':
-            tokens.pop(0)
-        elif peek(tokens).type in END:
-            break
+    while peek(tokens).type in FIRST_stmnt:
+        stmnt, tokens = parse_stmnt(tokens)
+        args.append(stmnt)
 
     return args, tokens
 
@@ -138,8 +138,7 @@ def parse_atom(tokens):
                 raise ParseError(f"expected ) but found {t.type}")
 
             return Expr('fcall', next.value, params), tokens
-
-        if peek(tokens).type == '[':
+        elif peek(tokens).type == '[':
             tokens.pop(0)
             expr, tokens = parse_expr(tokens)
 
@@ -326,6 +325,9 @@ def parse_block(tokens):
     else:
         block.type = 'block'
 
+    while peek(tokens).type == 'eol':
+        tokens.pop(0)
+
     if peek(tokens).type != '}':
         raise ParseError('expected }')
     tokens.pop(0)
@@ -358,12 +360,8 @@ def parse_stmnt(tokens):
 
     elif peek(tokens).type == 'command':
         left = tokens.pop(0)
-        next = peek(tokens)
-        if next.type is None or next.type == ';':
-            params = []
-        else:
-            params, tokens = parse_command_args(tokens)
-        return Expr('cmd', left.value, params), tokens
+        args, tokens = parse_command_args(tokens)
+        return Expr('cmd', left.value, args), tokens
 
     stmnt, tokens = parse_simple_stmnt(tokens)
 
@@ -380,11 +378,8 @@ def parse_stmnt(tokens):
 
 @trace
 def parse_simple_stmnt(tokens):
-    if peek(tokens).type == 'identifier' and peek(tokens, 1).type in ['=', ':']:
+    if peek(tokens).type == 'identifier' and peek(tokens, 1).type in FIRST_simple_stmnt_tail:
         ident = tokens.pop(0)
-        if ident.type != 'identifier':
-            raise ParseError(f"unexpected token: {ident.type}")
-
         left = Expr('var', ident.value)
 
         t = tokens.pop(0)
