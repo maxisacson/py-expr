@@ -32,7 +32,7 @@ atom:
 atom_ident_tail:
   | '=', expr
   | '(', items?, ')', [ '=', expr ]
-  | '[', expr, ']'
+  | '[', expr, ']', [ '=', expr ]
 items: expr, { ',', expr }
 block: '{', 'eol'*, stmnts?, 'eol'*, '}'
 end: ';' | 'eol'
@@ -135,7 +135,15 @@ def parse_atom_identifier(tokens):
             raise ParseError("expected closing ]")
         tokens.pop(0)
 
-        return Expr('idx', ident.value, expr), tokens
+        root = Expr('idx', ident.value, expr)
+
+        if peek(tokens).type == '=':
+            tokens.pop(0)
+            expr, tokens = parse_expr(tokens)
+            root = Expr('assign_item', root, expr)
+
+        return root, tokens
+
 
     return Expr('var', ident.value), tokens
 

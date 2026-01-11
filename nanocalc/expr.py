@@ -352,6 +352,18 @@ class Expr:
 
             return value
 
+        elif self.type == 'assign_item':
+            vname = self.left.left
+            idx = self.left.right._eval(context)
+            value = self.right._eval(context)
+
+            if vname in context:
+                context[vname][idx-1] = value
+            else:
+                GLOBALS[vname][idx-1] = value
+
+            return value
+
         elif self.type == 'lchain':
             lhs = self.left
 
@@ -425,6 +437,9 @@ def draw_tree(root, fname="tree"):
 
                 elif n.type == 'idx':
                     f.write(f'v{n.id}[label="{n.left}[]"];\n')
+
+                elif n.type == 'assign_item':
+                    f.write(f'v{n.id}[label="="];\n')
 
                 elif n.type == 'fdef':
                     f.write(f'v{n.id}[label="="];\n')
