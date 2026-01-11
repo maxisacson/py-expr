@@ -44,7 +44,7 @@ def test_cases():
 
 def test_function():
     code = """
-    f:x = {
+    f(x) = {
         x^2 + 2*x + 10
     }
     """
@@ -65,7 +65,7 @@ def test_function():
 
 def test_function2(capsys):
     code = """
-    f:x = {
+    f(x) = {
         0 if x < 0
         x^2
     }

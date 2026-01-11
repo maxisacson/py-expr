@@ -258,11 +258,15 @@ class Expr:
 
         elif self.type == ":=":
             fname = self.left.left
-            param_list = self.left.right
+            plist = self.left.right
             body = self.right
 
+            if not all(map(lambda p: p.type == 'var', plist)):
+                raise EvalError("expected parameter names")
+
             def f(*args):
-                return body._eval({k:v for k,v in zip(param_list, args)})
+                ctx = {p.left: a for p, a in zip(plist, args)}
+                return body._eval(ctx)
 
             GLOBALS[fname] = f
 

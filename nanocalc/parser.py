@@ -9,19 +9,9 @@ program: 'eol'*, stmnts?, 'eol'*
 stmnts: stmnt, { END, stmnt }, END?
 stmnt:
   | 'for', 'identifier', 'in', expr, 'eol'?, stmnt
-  | 'command', command_args
-  | simple_stmnt, [ 'if', expr, END ]
-simple_stmnt:
-  | 'identifier', simple_stmnt_tail
-  | expr
-simple_stmnt_tail:
-  | '=', expr
-  | ':', param_list?, '=', expr
-  | '(', param_list?, ')', '=', expr
-param_list: 'identifier', { ',', identifier }
-expr: disj, expr_tail?
-expr_tail: '..', disj, range_tail?
-range_tail: '..', ('+' | '-')?, disj
+  | 'command', expr*
+  | expr, [ 'if', expr ]
+expr: disj, [ '..', disj, [ '..', ('+' | '-')?, disj ] ]
 disj: conj, { 'or', conj }
 conj: neg, { 'and', neg }
 neg:
@@ -41,17 +31,17 @@ atom:
   | 'string'
   | block
 atom_ident_tail:
-  | '(', items?, ')'
+  | '=', expr
+  | '(', items?, ')', [ '=', expr ]
   | '[', expr, ']'
 items: expr, { ',', expr }
-command_args: stmnt*
 block: '{', 'eol'*, stmnts?, 'eol'*, '}'
 """
 
 
 FIRST_block = {'{'}
 FIRST_atom = {'identifier', '(', '[', '#', 'number', 'string'} | FIRST_block
-FIRST_factor = {'-'} | FIRST_atom
+FIRST_factor = {'-', '#'} | FIRST_atom
 FIRST_term = FIRST_factor
 FIRST_sum = FIRST_term
 FIRST_comp = FIRST_sum
@@ -60,12 +50,9 @@ FIRST_conj = FIRST_neg
 FIRST_disj = FIRST_conj
 FIRST_expr = FIRST_disj
 FIRST_param_list = {'identifier'}
-FIRST_simple_stmnt = {'identifier'} | FIRST_expr
-FIRST_simple_stmnt_tail = { '=', ':' }
-FIRST_stmnt = {'for', 'command'} | FIRST_simple_stmnt
+FIRST_stmnt = {'for', 'command'} | FIRST_expr
 FIRST_stmnts = FIRST_stmnt
 FIRST_program = {'eol'} | FIRST_stmnts
-FIRST_command_args = FIRST_stmnt
 FIRST_items = FIRST_expr
 
 END = {';', 'eol'}
@@ -94,17 +81,6 @@ def parse_items(tokens):
 
 
 @trace
-def parse_command_args(tokens):
-    args = []
-
-    while peek(tokens).type in FIRST_stmnt:
-        stmnt, tokens = parse_stmnt(tokens)
-        args.append(stmnt)
-
-    return args, tokens
-
-
-@trace
 def parse_param_list(tokens):
     param_list = []
 
@@ -121,36 +97,54 @@ def parse_param_list(tokens):
     return param_list, tokens
 
 
+def parse_atom_identifier(tokens):
+    ident = tokens.pop(0)
+    if peek(tokens).type == '=':
+        tokens.pop(0)
+        expr, tokens = parse_expr(tokens)
+        var = Expr('var', ident.value)
+
+        return Expr('=', var, expr), tokens
+
+    elif peek(tokens).type == '(':
+        tokens.pop(0)
+        if peek(tokens).type == ')':
+            items = []
+        else:
+            items, tokens = parse_items(tokens)
+
+        if peek(tokens).type != ')':
+            raise ParseError("expected )")
+        tokens.pop(0)
+
+        root = Expr('fcall', ident.value, items)
+
+        if peek(tokens).type == '=':
+            tokens.pop(0)
+            root.type = 'var'
+            expr, tokens = parse_expr(tokens)
+            root = Expr(':=', root, expr)
+
+        return root, tokens
+
+    elif peek(tokens).type == '[':
+        tokens.pop(0)
+        expr, tokens = parse_expr(tokens)
+
+        if peek(tokens).type != ']':
+            raise ParseError("expected closing ]")
+        tokens.pop(0)
+
+        return Expr('idx', ident.value, expr), tokens
+
+    return Expr('var', ident.value), tokens
+
 @trace
 def parse_atom(tokens):
     next = peek(tokens)
 
     if next.type == 'identifier':
-        tokens.pop(0)
-        if peek(tokens).type == '(':
-            tokens.pop(0)
-            if peek(tokens).type == ')':
-                tokens.pop(0)
-                return Expr('fcall', next.value, []), tokens
-
-            params, tokens = parse_items(tokens)
-            t = tokens.pop(0)
-            if t.type != ')':
-                raise ParseError(f"expected ) but found {t.type}")
-
-            return Expr('fcall', next.value, params), tokens
-        elif peek(tokens).type == '[':
-            tokens.pop(0)
-            expr, tokens = parse_expr(tokens)
-
-            if peek(tokens).type == ']':
-                tokens.pop(0)
-            else:
-                raise ParseError("expected closing ]")
-
-            return Expr('idx', next.value, expr), tokens
-
-        return Expr('var', next.value), tokens
+        return parse_atom_identifier(tokens)
 
     if next.type == '(':
         tokens.pop(0)
@@ -361,86 +355,21 @@ def parse_stmnt(tokens):
 
     elif peek(tokens).type == 'command':
         left = tokens.pop(0)
-        args, tokens = parse_command_args(tokens)
+        args = []
+        while peek(tokens).type in FIRST_expr:
+            arg, tokens = parse_expr(tokens)
+            args.append(arg)
+
         return Expr('cmd', left.value, args), tokens
 
-    stmnt, tokens = parse_simple_stmnt(tokens)
+    stmnt, tokens = parse_expr(tokens)
 
     if peek(tokens).type == 'if':
         tokens.pop(0)
         expr, tokens = parse_expr(tokens)
-        if peek(tokens).type not in END:
-            raise ParseError(f"expected ; or newline")
-
         stmnt = Expr('if', stmnt, expr)
 
     return stmnt, tokens
-
-
-@trace
-def parse_simple_stmnt(tokens):
-    if peek(tokens).type == 'identifier' and peek(tokens, 1).type == '(':
-        pos = 2
-        depth = 1
-        while depth > 0 and pos < len(tokens):
-            if peek(tokens, pos).type == '(':
-                depth += 1
-            elif peek(tokens, pos).type == ')':
-                depth -= 1
-            pos += 1
-
-        if peek(tokens, pos).type == '=':
-            ident = tokens.pop(0)
-            left = Expr('var', ident.value)
-            if tokens.pop(0).type != '(':
-                raise ParseError("expected (")
-            if peek(tokens).type == ')':
-                param_list = []
-            else:
-                param_list, tokens = parse_param_list(tokens)
-
-            left.right = param_list
-            if peek(tokens).type != ')':
-                raise ParseError("expected )")
-            tokens.pop(0)
-
-            if peek(tokens).type != '=':
-                raise ParseError("expected =")
-            tokens.pop(0)
-
-            expr, tokens = parse_expr(tokens)
-
-            return Expr(':=', left, expr), tokens
-
-    elif peek(tokens).type == 'identifier' and peek(tokens, 1).type in FIRST_simple_stmnt_tail - {'('}:
-        ident = tokens.pop(0)
-        left = Expr('var', ident.value)
-
-        t = tokens.pop(0)
-        if t.type == '=':
-            expr, tokens = parse_expr(tokens)
-
-            return Expr('=', left, expr), tokens
-
-        elif t.type == ':':
-            if peek(tokens).type == '=':
-                param_list = []
-            else:
-                param_list, tokens = parse_param_list(tokens)
-
-            left.right = param_list
-
-            t = tokens.pop(0)
-            if t.type != '=':
-                raise ParseError(f"unexpected token: {t.type}")
-
-            expr, tokens = parse_expr(tokens)
-
-            return Expr(':=', left, expr), tokens
-
-        raise ParseError(f"unexpected token: {t.type}")
-
-    return parse_expr(tokens)
 
 
 @trace
