@@ -17,6 +17,7 @@ simple_stmnt:
 simple_stmnt_tail:
   | '=', expr
   | ':', param_list?, '=', expr
+  | '(', param_list?, ')', '=', expr
 param_list: 'identifier', { ',', identifier }
 expr: disj, expr_tail?
 expr_tail: '..', disj, range_tail?
@@ -378,7 +379,40 @@ def parse_stmnt(tokens):
 
 @trace
 def parse_simple_stmnt(tokens):
-    if peek(tokens).type == 'identifier' and peek(tokens, 1).type in FIRST_simple_stmnt_tail:
+    if peek(tokens).type == 'identifier' and peek(tokens, 1).type == '(':
+        pos = 2
+        depth = 1
+        while depth > 0 and pos < len(tokens):
+            if peek(tokens, pos).type == '(':
+                depth += 1
+            elif peek(tokens, pos).type == ')':
+                depth -= 1
+            pos += 1
+
+        if peek(tokens, pos).type == '=':
+            ident = tokens.pop(0)
+            left = Expr('var', ident.value)
+            if tokens.pop(0).type != '(':
+                raise ParseError("expected (")
+            if peek(tokens).type == ')':
+                param_list = []
+            else:
+                param_list, tokens = parse_param_list(tokens)
+
+            left.right = param_list
+            if peek(tokens).type != ')':
+                raise ParseError("expected )")
+            tokens.pop(0)
+
+            if peek(tokens).type != '=':
+                raise ParseError("expected =")
+            tokens.pop(0)
+
+            expr, tokens = parse_expr(tokens)
+
+            return Expr(':=', left, expr), tokens
+
+    elif peek(tokens).type == 'identifier' and peek(tokens, 1).type in FIRST_simple_stmnt_tail - {'('}:
         ident = tokens.pop(0)
         left = Expr('var', ident.value)
 
