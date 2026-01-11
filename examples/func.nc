@@ -1,4 +1,4 @@
-# g:x = {
+# g(x) = {
 #     a = x^2
 #     b = 2*x
 #     c = 1
@@ -7,7 +7,7 @@
 
 print "this is a string not a comment"
 
-f:x = {
+f(x) = {
     x^2 if x > 3
     2*x if x > 0
     1

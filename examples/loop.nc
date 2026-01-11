@@ -1,4 +1,4 @@
-f:x= {
+f(x)= {
   {
     print x
     f(x+1)
