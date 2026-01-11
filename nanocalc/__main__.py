@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
 import sys
+import argparse
+import subprocess
+
 from .lexer import tokenize
 from .parser import parse
-from .expr import GLOBALS
+from .expr import GLOBALS, draw_tree
 from .common import TRACE, ExprError
 
 
@@ -13,34 +16,46 @@ def parse_expression(s):
     return root
 
 
-def _main(argv):
-    if len(argv) < 2:
-        if sys.stdin.isatty():
-            for line in sys.stdin:
-                expr = parse_expression(line)
-                result = expr.eval()
-                if result is not None:
-                    GLOBALS['_'] = result
-                    GLOBALS['ans'] = result
-                    print('=', result)
-            return
+def repl():
+    for line in sys.stdin:
+        expr = parse_expression(line)
+        result = expr.eval()
+        if result is not None:
+            GLOBALS['_'] = result
+            GLOBALS['ans'] = result
+            print('=', result)
 
-        input = sys.stdin.read()
-    elif argv[1] == 'file':
-        with open(argv[2]) as f:
+def _main(args):
+    if args.file is not None:
+        with open(args.file) as f:
             input = f.read()
+    elif len(args.input) > 0:
+        input = '\n'.join(args.input)
+    elif not sys.stdin.isatty():
+        input = sys.stdin.read()
     else:
-        input = '\n'.join(argv[1:])
+        repl()
+        return
 
     program = parse_expression(input)
     result = program.eval()
     if result is not None:
         print(result)
 
+    if args.ast:
+        draw_tree(program, "ast")
+        subprocess.run(["xdg-open", "ast.svg"])
+
 
 def main():
+    argp = argparse.ArgumentParser(prog='nc')
+    argp.add_argument('input', nargs='*')
+    argp.add_argument('-f', '--file', type=str)
+    argp.add_argument('--ast', action='store_true')
+    args = argp.parse_args()
+
     try:
-        _main(sys.argv)
+        _main(args)
         return 0
     except ExprError as e:
         if TRACE:

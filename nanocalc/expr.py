@@ -32,15 +32,6 @@ def _print(context, *args):
     print(*p)
 
 
-def _ast(_, *args):
-    if len(args) != 1:
-        raise EvalError("ast: expected 1 argument")
-
-    expr = args[0]
-    draw_tree(expr, "ast")
-    subprocess.run(["xdg-open", "ast.svg"])
-
-
 def _sum(context, *args):
     if len(args) == 1:
         expr, = args
@@ -72,7 +63,6 @@ def _prod(context, *args):
 COMMANDS = {
     'print': _print,
     'table': _table,
-    'ast': _ast,
     'sum': _sum,
     'prod': _prod,
 }
