@@ -4,9 +4,8 @@ from .expr import Expr
 
 
 GRAMMAR = """
-END: ';' | 'eol'
 program: 'eol'*, stmnts?, 'eol'*
-stmnts: stmnt, { END, stmnt }, END?
+stmnts: stmnt, { end, stmnt }, end?
 stmnt:
   | 'for', 'identifier', 'in', expr, 'eol'?, stmnt
   | 'command', expr*
@@ -36,6 +35,7 @@ atom_ident_tail:
   | '[', expr, ']'
 items: expr, { ',', expr }
 block: '{', 'eol'*, stmnts?, 'eol'*, '}'
+end: ';' | 'eol'
 """
 
 
