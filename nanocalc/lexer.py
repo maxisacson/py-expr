@@ -4,11 +4,13 @@ import re
 
 
 class Token:
-    def __init__(self, type, value):
+    def __init__(self, type, value=None):
         self.type = type
         self.value = value
 
     def __repr__(self):
+        if self.value is None:
+            return f"Token('{self.type}')"
         return f"Token('{self.type}', {self.value})"
 
 
@@ -113,18 +115,12 @@ def tokenize(s):
     while len(s) > 0:
         if s[0] == '\n':
             s = s[1:]
-            if not tokens or tokens[-1].type != 'eol':
-                tokens.append(Token('eol', None))
+            tokens.append(Token('eol', None))
             continue
 
         if re.match(r'\s', s[0]):
             s = s[1:]
             continue
-
-        if s[0] == ';':
-            if tokens and tokens[-1].type == ';':
-                s = s[1:]
-                continue
 
         if s[0] == '#' and len(s) > 1 and s[1] == ' ':
             while len(s) > 0 and s[0] != '\n':

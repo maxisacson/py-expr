@@ -5,7 +5,7 @@ from .expr import Expr
 
 GRAMMAR = """
 program: 'eol'*, stmnts?, 'eol'*
-stmnts: stmnt, { end, stmnt }, end?
+stmnts: stmnt, { end+, stmnt }, end*
 stmnt:
   | 'for', 'identifier', 'in', expr, 'eol'?, stmnt
   | 'command', expr*
@@ -382,6 +382,8 @@ def parse_stmnts(tokens):
         if peek(tokens).type in FIRST_stmnt:
             stmnt, tokens = parse_stmnt(tokens)
             stmnts.append(stmnt)
+        elif peek(tokens).type in END:
+            continue
         else:
             break
 

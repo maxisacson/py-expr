@@ -10,15 +10,12 @@ from .expr import GLOBALS, draw_tree
 from .common import TRACE, ExprError
 
 
-def parse_expression(s):
-    tokens = tokenize(s)
-    root = parse(tokens)
-    return root
-
-
-def repl():
+def repl(args):
     for line in sys.stdin:
-        expr = parse_expression(line)
+        tokens = tokenize(line)
+        if args.tokens:
+            print(tokens)
+        expr = parse(tokens)
         result = expr.eval()
         if result is not None:
             GLOBALS['_'] = result
@@ -37,7 +34,10 @@ def _main(args):
         repl()
         return
 
-    program = parse_expression(input)
+    tokens = tokenize(input)
+    if args.tokens:
+        print(tokens)
+    program = parse(tokens)
     result = program.eval()
     if result is not None:
         print(result)
@@ -52,6 +52,7 @@ def main():
     argp.add_argument('input', nargs='*')
     argp.add_argument('-f', '--file', type=str)
     argp.add_argument('--ast', action='store_true')
+    argp.add_argument('--tokens', action='store_true')
     args = argp.parse_args()
 
     try:

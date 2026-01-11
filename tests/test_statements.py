@@ -1,7 +1,15 @@
 import pytest
 import sys
 
-from nanocalc.__main__ import parse_expression
+from nanocalc.lexer import tokenize
+from nanocalc.parser import parse
+
+
+def parse_expression(input):
+    tokens = tokenize(input)
+    program = parse(tokens)
+    return program
+
 
 def test_assignment():
     code = "x = 14"
@@ -123,3 +131,55 @@ def test_loop3(capsys):
 
     cap = capsys.readouterr()
     assert cap.out == "1\n2\n3\n4\n"
+
+
+"""
+# Simple statements
+x
+42
+"hello"
+(x + y)
+
+# Assignments
+x = 5
+f: x = 10
+x = 5 if y > 0;
+
+# Expressions
+a + b * c
+2..10..+2
+-x^2
+not a and b or c
+
+# Blocks
+{}
+{ x = 1; y = 2 }
+{ x; { y; z } }
+
+# Loops
+for i in 0..10 x = i;
+for x in list { print x }
+
+# Commands
+command x
+command x y z
+command x { y } z
+command a b c
+
+# Nested / complex block
+{
+  x = 10;
+  y = 20 if x > 5;
+  command print x y;
+  for i in 0..x {
+    z = i * 2;
+  }
+}
+
+# Edge cases
+{}
+{ ; }
+x if y > 0
+x = (a + b) * c
+command
+"""
