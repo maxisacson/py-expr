@@ -287,7 +287,9 @@ class Expr:
                     return list(range(left, right+1, step))
                 elif type == 'count' and isinstance(step, int):
                     count = step
-                    if (right - left) % (count - 1) == 0:
+                    if right == left:
+                        return [left] * count
+                    elif (right - left) % (count - 1) == 0:
                         step = (right - left) // (count - 1)
                         return list(range(left, right+1, step))
 
