@@ -246,7 +246,7 @@ class Expr:
 
             return value
 
-        elif self.type == ":=":
+        elif self.type == "fdef":
             fname = self.left.left
             plist = self.left.right
             body = self.right
@@ -408,7 +408,11 @@ def draw_tree(root, fname="tree"):
                     f.write(f'v{n.id}[label="{n.left}()"];\n')
 
                 elif n.type == 'var':
-                    f.write(f'v{n.id}[label="{n.left}"];\n')
+                    if isinstance(n.right, list):
+                        plist = ",".join([p.left for p in n.right])
+                        f.write(f'v{n.id}[label="{n.left}({plist})"];\n')
+                    else:
+                        f.write(f'v{n.id}[label="{n.left}"];\n')
 
                 elif n.type == 'cmd':
                     f.write(f'v{n.id}[label="{n.left}"];\n')
@@ -421,6 +425,9 @@ def draw_tree(root, fname="tree"):
 
                 elif n.type == 'idx':
                     f.write(f'v{n.id}[label="{n.left}[]"];\n')
+
+                elif n.type == 'fdef':
+                    f.write(f'v{n.id}[label="="];\n')
 
                 else:
                     f.write(f'v{n.id}[label="{n.type}"];\n')

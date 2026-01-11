@@ -123,7 +123,7 @@ def parse_atom_identifier(tokens):
             tokens.pop(0)
             root.type = 'var'
             expr, tokens = parse_expr(tokens)
-            root = Expr(':=', root, expr)
+            root = Expr('fdef', root, expr)
 
         return root, tokens
 
