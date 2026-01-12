@@ -3,6 +3,29 @@ import subprocess
 import math
 
 
+def normalize_args(*args):
+    N = 0
+    for a in args:
+        if isinstance(a, list):
+            N = max(N, len(a))
+        else:
+            N = max(N, 1)
+
+    new_args = []
+    for a in args:
+        if isinstance(a, list):
+            if len(a) == N:
+                new_args.append(a)
+            elif len(a) == 1:
+                new_args.append(a * N)
+            else:
+                raise EvalError("arguments have to be either size 0, 1 or size N")
+        else:
+            new_args.append([a] * N)
+
+    return new_args
+
+
 def _table(context, *args):
     cols = []
     rows = 0
@@ -30,6 +53,15 @@ def _table(context, *args):
 def _print(context, *args):
     p = [a.eval(context) for a in args]
     print(*p)
+
+
+def _write(context, *args):
+    p = [a.eval(context) for a in args]
+    nargs = normalize_args(*p)
+    for arg in zip(*nargs):
+        b = ''.join(map(str, arg)).encode()
+        s = b.decode('unicode_escape')
+        print(s, end='')
 
 
 def _sum(context, *args):
@@ -62,6 +94,7 @@ def _prod(context, *args):
 
 COMMANDS = {
     'print': _print,
+    'write': _write,
     'table': _table,
     'sum': _sum,
     'prod': _prod,
@@ -320,6 +353,12 @@ class Expr:
 
         elif self.type == 'if':
             cond = self.right._eval(context)
+
+            if isinstance(cond, list):
+                if all(cond):
+                    return self.left._eval(context)
+                return None
+
             if cond:
                 return self.left._eval(context)
 
@@ -348,9 +387,17 @@ class Expr:
             idx = self.right._eval(context)
 
             if vname in context:
-                value = context[vname][idx-1]
+                var = context[vname]
             else:
-                value = GLOBALS[vname][idx-1]
+                var = GLOBALS[vname]
+
+            N = len(var)
+            if isinstance(idx, int):
+                value = var[(idx-1)%N]
+            elif isinstance(idx, list):
+                value = [var[(i-1)%N] for i in idx]
+            else:
+                raise EvalError('expected int or list')
 
             return value
 
