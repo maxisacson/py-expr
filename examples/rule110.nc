@@ -1,4 +1,5 @@
-M = 256
+N = 512
+M = 128
 state = 0..0..M
 state[0] = 1
 
@@ -15,7 +16,7 @@ f(i) = {
 
 write state " "
 write "\n"
-for i in 0..512 {
+for i in 2..N {
     next = 0..0..M
     for j in 1..#state {
         next[j] = f(j)
