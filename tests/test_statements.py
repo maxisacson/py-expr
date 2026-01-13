@@ -131,3 +131,20 @@ def test_loop3(capsys):
 
     cap = capsys.readouterr()
     assert cap.out == "1\n2\n3\n4\n"
+
+
+def test_nested_scopes():
+    code = """
+    a = 1
+    f(x) = {
+        b = 2
+        g(y) = b * y
+        a * g(x)
+    }
+    f(3)
+    """
+    e = parse_expression(code)
+    v = e.eval()
+
+    assert v == 6
+

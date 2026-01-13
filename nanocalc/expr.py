@@ -109,8 +109,7 @@ KEYWORDS = {
     'in',
 }
 
-
-GLOBALS = {
+BUILTINS = {
     'nil': None,
     'sin': math.sin,
     'cos': math.cos,
@@ -123,6 +122,8 @@ GLOBALS = {
     'pi': math.pi,
     'e': math.e,
 }
+
+GLOBALS = {}
 
 
 def binop_reduce(op, context, left, right):
@@ -254,8 +255,10 @@ class Expr:
 
             if fname in context:
                 func = context[fname]
-            else:
+            elif fname in GLOBALS:
                 func = GLOBALS[fname]
+            else:
+                func = BUILTINS[fname]
 
             return func_reduce(func, context, *params)
 
@@ -264,8 +267,10 @@ class Expr:
 
             if vname in context:
                 value = context[vname]
-            else:
+            elif vname in GLOBALS:
                 value = GLOBALS[vname]
+            else:
+                value = BUILTINS[vname]
 
             return value
 
@@ -388,8 +393,10 @@ class Expr:
 
             if vname in context:
                 var = context[vname]
-            else:
+            elif vname in GLOBALS:
                 var = GLOBALS[vname]
+            else:
+                var = BUILTINS[vname]
 
             N = len(var)
             if isinstance(idx, int):
