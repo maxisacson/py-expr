@@ -92,12 +92,45 @@ def _prod(context, *args):
     return v
 
 
+def _dump(context, *args):
+    d = {}
+    while context is not None:
+        d = context._d | d
+        context = context._parent
+
+    for k, v in d.items():
+        print(f"{k} = {v}")
+
+
+class Context:
+    def __init__(self, d, parent=None, ro=False):
+        self._d = d
+        self._parent = parent
+        self._ro = ro
+
+    def __getitem__(self, key):
+        if key in self._d:
+            return self._d[key]
+        else:
+            return self._parent[key]
+
+    def __setitem__(self, key, value):
+        if self._ro:
+            raise EvalError("trying to assign in a read only context")
+
+        self._d[key] = value
+
+    def __str__(self):
+        return str(self._d)
+
+
 COMMANDS = {
     'print': _print,
     'write': _write,
     'table': _table,
     'sum': _sum,
     'prod': _prod,
+    'dump': _dump,
 }
 
 KEYWORDS = {
@@ -109,7 +142,7 @@ KEYWORDS = {
     'in',
 }
 
-BUILTINS = {
+BUILTINS = Context({
     'nil': None,
     'sin': math.sin,
     'cos': math.cos,
@@ -121,9 +154,9 @@ BUILTINS = {
     'exp': math.exp,
     'pi': math.pi,
     'e': math.e,
-}
+}, ro=True)
 
-GLOBALS = {}
+GLOBALS = Context({}, parent=BUILTINS)
 
 
 def binop_reduce(op, context, left, right):
@@ -189,7 +222,7 @@ class Expr:
         self.id = Expr.ID
         Expr.ID += 1
 
-    def eval(self, context={}):
+    def eval(self, context=GLOBALS):
         return self._eval(context)
 
     @trace
@@ -252,36 +285,18 @@ class Expr:
         elif self.type == 'fcall':
             fname = self.left
             params = self.right
-
-            if fname in context:
-                func = context[fname]
-            elif fname in GLOBALS:
-                func = GLOBALS[fname]
-            else:
-                func = BUILTINS[fname]
-
+            func = context[fname]
             return func_reduce(func, context, *params)
 
         elif self.type == 'var':
             vname = self.left
-
-            if vname in context:
-                value = context[vname]
-            elif vname in GLOBALS:
-                value = GLOBALS[vname]
-            else:
-                value = BUILTINS[vname]
-
+            value = context[vname]
             return value
 
         elif self.type == '=':
             vname = self.left.left
             value = self.right._eval(context)
-            if vname in context:
-                context[vname] = value
-            else:
-                GLOBALS[vname] = value
-
+            context[vname] = value
             return value
 
         elif self.type == "fdef":
@@ -293,7 +308,7 @@ class Expr:
                 raise EvalError("expected parameter names")
 
             def f(*args):
-                ctx = {p.left: a for p, a in zip(plist, args)}
+                ctx = Context({p.left: a for p, a in zip(plist, args)}, parent=context)
                 return body._eval(ctx)
 
             GLOBALS[fname] = f
@@ -391,18 +406,13 @@ class Expr:
             vname = self.left
             idx = self.right._eval(context)
 
-            if vname in context:
-                var = context[vname]
-            elif vname in GLOBALS:
-                var = GLOBALS[vname]
-            else:
-                var = BUILTINS[vname]
+            var = context[vname]
 
             N = len(var)
             if isinstance(idx, int):
-                value = var[(idx-1)%N]
+                value = var[(idx-1) % N]
             elif isinstance(idx, list):
-                value = [var[(i-1)%N] for i in idx]
+                value = [var[(i-1) % N] for i in idx]
             else:
                 raise EvalError('expected int or list')
 
@@ -413,10 +423,7 @@ class Expr:
             idx = self.left.right._eval(context)
             value = self.right._eval(context)
 
-            if vname in context:
-                context[vname][idx-1] = value
-            else:
-                GLOBALS[vname][idx-1] = value
+            context[vname][idx-1] = value
 
             return value
 
@@ -439,18 +446,12 @@ class Expr:
             vname = var.left
             body = self.right
 
-            if vname in context:
-                ctx = context
-            else:
-                ctx = GLOBALS
-
             values = expr._eval(context)
             for value in values:
-                ctx[vname] = value
+                context[vname] = value
                 body._eval(context)
 
             return None
-
 
         else:
             raise EvalError(f"unknown expression type: {self.type}")

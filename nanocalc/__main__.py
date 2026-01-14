@@ -31,7 +31,7 @@ def _main(args):
     elif not sys.stdin.isatty():
         input = sys.stdin.read()
     else:
-        repl()
+        repl(args)
         return
 
     tokens = tokenize(input)
