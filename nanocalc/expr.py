@@ -1,6 +1,7 @@
 from .common import EvalError, trace
 import subprocess
 import math
+import types
 
 
 def normalize_args(*args):
@@ -296,6 +297,10 @@ class Expr:
         elif self.type == '=':
             vname = self.left.left
             value = self.right._eval(context)
+
+            if isinstance(value, types.GeneratorType):
+                value = list(value)
+
             context[vname] = value
             return value
 
@@ -335,16 +340,16 @@ class Expr:
 
             if isinstance(left, int) and isinstance(right, int):
                 if type == 'count' and step == 'auto':
-                    return list(range(left, right+1, 1))
+                    return (n for n in range(left, right+1, 1))
                 elif type == 'incr' and isinstance(step, int):
-                    return list(range(left, right+1, step))
+                    return (n for n in range(left, right+1, step))
                 elif type == 'count' and isinstance(step, int):
                     count = step
                     if right == left:
-                        return [left] * count
+                        return (left for _ in range(count))
                     elif (right - left) % (count - 1) == 0:
                         step = (right - left) // (count - 1)
-                        return list(range(left, right+1, step))
+                        return (n for n in range(left, right+1, step))
 
             if type == 'count':
                 if step == 'auto':
@@ -352,19 +357,19 @@ class Expr:
                 else:
                     count = step
                 step = (right - left) / (count - 1)
-                return [left + i*step for i in range(count)]
+                return (left + i*step for i in range(count))
             elif type == 'incr':
                 if step == 'auto':
                     count = 50
                     step = (right - left) / (count - 1)
-                    return [left + i*step for i in range(count)]
+                    return (left + i*step for i in range(count))
                 else:
                     def g():
                         x = left
                         while x <= right:
                             yield x
                             x += step
-                    return list(g())
+                    return g()
 
             raise EvalError(f"Error: unknown range type: {type}")
 

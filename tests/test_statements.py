@@ -1,5 +1,5 @@
 import pytest
-import sys
+import types
 
 from nanocalc.lexer import tokenize
 from nanocalc.parser import parse
@@ -148,3 +148,90 @@ def test_nested_scopes():
 
     assert v == 6
 
+
+def test_range():
+    code = "1..5"
+
+    e = parse_expression(code)
+    v = e.eval()
+
+    assert isinstance(v, types.GeneratorType)
+    actual = list(v)
+    expected = [1,2,3,4,5]
+
+    assert actual == expected
+
+
+def test_range2():
+    code = "0..4..3"
+
+    e = parse_expression(code)
+    v = e.eval()
+
+    assert isinstance(v, types.GeneratorType)
+    actual = list(v)
+    expected = [0, 2, 4]
+
+    assert actual == expected
+
+
+def test_range3():
+    code = "1..7..+2"
+
+    e = parse_expression(code)
+    v = e.eval()
+
+    assert isinstance(v, types.GeneratorType)
+    actual = list(v)
+    expected = [1, 3, 5, 7]
+
+    assert actual == expected
+
+def test_range4():
+    code = "0..1..3"
+
+    e = parse_expression(code)
+    v = e.eval()
+
+    assert isinstance(v, types.GeneratorType)
+    actual = list(v)
+    expected = [0.0, 0.5, 1.0]
+
+    assert actual == expected
+
+
+def test_range5():
+    code = "0...1..2"
+
+    e = parse_expression(code)
+    v = e.eval()
+
+    assert isinstance(v, types.GeneratorType)
+    actual = list(v)
+    expected = [0.0, 1.0]
+
+    assert all(map(lambda x: isinstance(x, float), actual))
+    assert actual == expected
+
+def test_range6():
+    code = "0...1..+0.2"
+
+    e = parse_expression(code)
+    v = e.eval()
+
+    assert isinstance(v, types.GeneratorType)
+    actual = list(v)
+    expected = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+
+    assert actual == pytest.approx(expected)
+
+def test_range7():
+    code = "x=0..1"
+
+    e = parse_expression(code)
+    actual = e.eval()
+
+    assert isinstance(actual, list)
+    expected = [0, 1]
+
+    assert actual == expected
