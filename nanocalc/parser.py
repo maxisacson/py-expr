@@ -28,6 +28,7 @@ atom:
   | '[', items?, ']'
   | 'number'
   | 'string'
+  | 'Inf'
   | block
 atom_ident_tail:
   | '=', expr
@@ -180,6 +181,10 @@ def parse_atom(tokens):
     if next.type == 'string':
         next = tokens.pop(0)
         return Expr('literal', next.value), tokens
+
+    if next.type == 'Inf':
+        next == tokens.pop(0)
+        return Expr('Inf', None), tokens
 
     if next.type in FIRST_block:
         return parse_block(tokens)

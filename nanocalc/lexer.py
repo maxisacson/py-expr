@@ -1,6 +1,16 @@
 from .common import TokenError, trace
-from .expr import KEYWORDS, COMMANDS
+from .expr import COMMANDS
 import re
+
+KEYWORDS = {
+    'if',
+    'and',
+    'or',
+    'not',
+    'for',
+    'in',
+    'Inf',
+}
 
 
 class Token:
@@ -67,15 +77,12 @@ def tok_ident_or_keyword(s):
 
 
 def tok_range(s):
-    token = ''
-
     for _ in range(2):
         t, s = s[0], s[1:]
         if t != '.':
             raise TokenError(f"unexpected token: {t}")
-        token += t
 
-    return Token('..', token), s
+    return Token('..'), s
 
 
 def tok_string(s):

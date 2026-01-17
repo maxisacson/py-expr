@@ -145,15 +145,6 @@ COMMANDS = {
     'dump': _dump,
 }
 
-KEYWORDS = {
-    'if',
-    'and',
-    'or',
-    'not',
-    'for',
-    'in',
-}
-
 BUILTINS = Context({
     'nil': None,
     'sin': math.sin,
@@ -339,15 +330,46 @@ class Expr:
 
         elif self.type == 'range':
             if isinstance(self.left, list):
-                left = self.left[0]._eval(context)
-                right = self.left[1]._eval(context)
+                left = self.left[0]
+                right = self.left[1]
                 step = self.right[0]._eval(context)
                 type = self.right[1]
             else:
-                left = self.left._eval(context)
-                right = self.right._eval(context)
+                left = self.left
+                right = self.right
                 step = 'auto'
                 type = 'count'
+
+            left = left._eval(context)
+
+            if right.type == 'Inf':
+                if type == 'incr':
+                    if step == 'auto':
+                        step = 1
+                    def g():
+                        x = left
+                        while True:
+                            yield x
+                            x += step
+                    return g()
+                elif type == 'count':
+                    count = step
+                    if count == 'auto':
+                        def g():
+                            x = left
+                            while True:
+                                yield x
+                                x += 1
+                        return g()
+                    else:
+                        def g():
+                            x = left
+                            for _ in range(count):
+                                yield x
+                                x += 1
+                        return g()
+
+            right = right._eval(context)
 
             if isinstance(left, int) and isinstance(right, int):
                 if type == 'count' and step == 'auto':
@@ -468,6 +490,9 @@ class Expr:
                 body._eval(context)
 
             return None
+
+        elif self.type == 'Inf':
+            raise EvalError('cannot evaluate Inf in this context')
 
         else:
             raise EvalError(f"unknown expression type: {self.type}")

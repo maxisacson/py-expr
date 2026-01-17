@@ -235,3 +235,15 @@ def test_range7():
     expected = [0, 1]
 
     assert actual == expected
+
+def test_range8():
+    code = "0..Inf..3"
+
+    e = parse_expression(code)
+    v = e.eval()
+
+    assert isinstance(v, types.GeneratorType)
+    actual = list(v)
+    expected = [0, 1, 2]
+
+    assert actual == expected
