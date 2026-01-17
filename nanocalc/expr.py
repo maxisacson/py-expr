@@ -31,7 +31,7 @@ def _table(context, *args):
     cols = []
     rows = 0
     for a in args:
-        y = a.eval(context)
+        y = reduce(a.eval(context))
         if isinstance(y, list):
             cols.append(y)
         else:
@@ -51,13 +51,20 @@ def _table(context, *args):
         print(*row)
 
 
+def reduce(v):
+    if isinstance(v, types.GeneratorType):
+        return list(v)
+
+    return v
+
+
 def _print(context, *args):
-    p = [a.eval(context) for a in args]
+    p = [reduce(a.eval(context)) for a in args]
     print(*p)
 
 
 def _write(context, *args):
-    p = [a.eval(context) for a in args]
+    p = [reduce(a.eval(context)) for a in args]
     nargs = normalize_args(*p)
     for arg in zip(*nargs):
         b = ''.join(map(str, arg)).encode()
@@ -74,8 +81,12 @@ def _sum(context, *args):
 
     v = expr.eval(context)
 
+    if isinstance(v, types.GeneratorType):
+        v = list(v)
+
     if isinstance(v, list):
         return sum(v)
+
     return v
 
 
@@ -192,7 +203,7 @@ def unop_reduce(op, context, right):
 def func_reduce(f, context, *args):
     for i,arg in enumerate(args):
         if isinstance(arg, Expr):
-            return func_reduce(f, context, *args[:i], arg.eval(context), *args[i+1:])
+            return func_reduce(f, context, *args[:i], reduce(arg.eval(context)), *args[i+1:])
 
     k = 0
     count = 0
