@@ -1,5 +1,4 @@
 import pytest
-import sys
 
 from nanocalc.lexer import tokenize
 from nanocalc.parser import parse
@@ -9,6 +8,7 @@ def parse_expression(input):
     tokens = tokenize(input)
     program = parse(tokens)
     return program
+
 
 TEST_DATA = [
     ('1+2*3', 7),

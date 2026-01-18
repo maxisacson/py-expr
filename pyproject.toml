@@ -16,3 +16,6 @@ Issues = "https://github.com/maxisacson/nanocalc-py/issues"
 
 [project.scripts]
 nc = "nanocalc.__main__:main"
+
+[tool.black]
+skip-string-normalization = true

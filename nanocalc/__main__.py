@@ -22,6 +22,7 @@ def repl(args):
             GLOBALS['ans'] = result
             print('=', result)
 
+
 def _main(args):
     if args.file is not None:
         with open(args.file) as f:
@@ -61,6 +62,7 @@ def main():
     except ExprError as e:
         if TRACE:
             import traceback
+
             traceback.print_exception(e)
         else:
             print(f'Error: {e}')

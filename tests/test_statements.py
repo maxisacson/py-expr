@@ -19,6 +19,7 @@ def test_assignment():
 
     assert v == 14
 
+
 def test_block():
     code = """
     {
@@ -86,6 +87,7 @@ def test_function2(capsys):
 
     cap = capsys.readouterr()
     assert cap.out == "-2 0\n-1 0\n0 0\n1 1\n2 4\n"
+
 
 def test_loop(capsys):
     code = """
@@ -157,7 +159,7 @@ def test_range():
 
     assert isinstance(v, types.GeneratorType)
     actual = list(v)
-    expected = [1,2,3,4,5]
+    expected = [1, 2, 3, 4, 5]
 
     assert actual == expected
 
@@ -187,6 +189,7 @@ def test_range3():
 
     assert actual == expected
 
+
 def test_range4():
     code = "0..1..3"
 
@@ -213,6 +216,7 @@ def test_range5():
     assert all(map(lambda x: isinstance(x, float), actual))
     assert actual == expected
 
+
 def test_range6():
     code = "0...1..+0.2"
 
@@ -225,6 +229,7 @@ def test_range6():
 
     assert actual == pytest.approx(expected)
 
+
 def test_range7():
     code = "x=0..1"
 
@@ -235,6 +240,7 @@ def test_range7():
     expected = [0, 1]
 
     assert actual == expected
+
 
 def test_range8():
     code = "0..Inf..3"

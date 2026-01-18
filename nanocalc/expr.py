@@ -43,7 +43,7 @@ def _table(context, *args):
 
         rows = max(rows, n)
 
-    for i,c in enumerate(cols):
+    for i, c in enumerate(cols):
         if len(c) < rows:
             cols[i] = [c[0]] * rows
 
@@ -74,9 +74,12 @@ def _write(context, *args):
 
 def _sum(context, *args):
     if len(args) == 1:
-        expr, = args
+        (expr,) = args
     else:
-        init, expr, = args
+        (
+            init,
+            expr,
+        ) = args
         init.eval(context)
 
     v = expr.eval(context)
@@ -92,9 +95,12 @@ def _sum(context, *args):
 
 def _prod(context, *args):
     if len(args) == 1:
-        expr, = args
+        (expr,) = args
     else:
-        init, expr, = args
+        (
+            init,
+            expr,
+        ) = args
         init.eval(context)
 
     v = expr.eval(context)
@@ -145,19 +151,22 @@ COMMANDS = {
     'dump': _dump,
 }
 
-BUILTINS = Context({
-    'nil': None,
-    'sin': math.sin,
-    'cos': math.cos,
-    'tan': math.tan,
-    'asin': math.asin,
-    'acos': math.acos,
-    'atan': math.atan,
-    'sqrt': math.sqrt,
-    'exp': math.exp,
-    'pi': math.pi,
-    'e': math.e,
-}, ro=True)
+BUILTINS = Context(
+    {
+        'nil': None,
+        'sin': math.sin,
+        'cos': math.cos,
+        'tan': math.tan,
+        'asin': math.asin,
+        'acos': math.acos,
+        'atan': math.atan,
+        'sqrt': math.sqrt,
+        'exp': math.exp,
+        'pi': math.pi,
+        'e': math.e,
+    },
+    ro=True,
+)
 
 GLOBALS = Context({}, parent=BUILTINS)
 
@@ -192,13 +201,15 @@ def unop_reduce(op, context, right):
 
 
 def func_reduce(f, context, *args):
-    for i,arg in enumerate(args):
+    for i, arg in enumerate(args):
         if isinstance(arg, Expr):
-            return func_reduce(f, context, *args[:i], reduce(arg.eval(context)), *args[i+1:])
+            return func_reduce(
+                f, context, *args[:i], reduce(arg.eval(context)), *args[i + 1 :]
+            )
 
     k = 0
     count = 0
-    for i,arg in enumerate(args):
+    for i, arg in enumerate(args):
         if isinstance(arg, list):
             k = i
             count += 1
@@ -207,7 +218,7 @@ def func_reduce(f, context, *args):
         return f(*args)
 
     if count == 1:
-        return [f(*args[:k], x, *args[k+1:]) for x in args[k]]
+        return [f(*args[:k], x, *args[k + 1 :]) for x in args[k]]
 
     if count == len(args):
         return [f(*a) for a in zip(*args)]
@@ -258,7 +269,7 @@ class Expr:
             return binop_reduce(lambda x, y: x / y, context, self.left, self.right)
 
         elif self.type == '^':
-            return binop_reduce(lambda x, y: x ** y, context, self.left, self.right)
+            return binop_reduce(lambda x, y: x**y, context, self.left, self.right)
 
         elif self.type == '%':
             return binop_reduce(lambda x, y: x % y, context, self.left, self.right)
@@ -346,43 +357,49 @@ class Expr:
                 if type == 'incr':
                     if step == 'auto':
                         step = 1
+
                     def g():
                         x = left
                         while True:
                             yield x
                             x += step
+
                     return g()
                 elif type == 'count':
                     count = step
                     if count == 'auto':
+
                         def g():
                             x = left
                             while True:
                                 yield x
                                 x += 1
+
                         return g()
                     else:
+
                         def g():
                             x = left
                             for _ in range(count):
                                 yield x
                                 x += 1
+
                         return g()
 
             right = right._eval(context)
 
             if isinstance(left, int) and isinstance(right, int):
                 if type == 'count' and step == 'auto':
-                    return (n for n in range(left, right+1, 1))
+                    return (n for n in range(left, right + 1, 1))
                 elif type == 'incr' and isinstance(step, int):
-                    return (n for n in range(left, right+1, step))
+                    return (n for n in range(left, right + 1, step))
                 elif type == 'count' and isinstance(step, int):
                     count = step
                     if right == left:
                         return (left for _ in range(count))
                     elif (right - left) % (count - 1) == 0:
                         step = (right - left) // (count - 1)
-                        return (n for n in range(left, right+1, step))
+                        return (n for n in range(left, right + 1, step))
 
             if type == 'count':
                 if step == 'auto':
@@ -390,18 +407,20 @@ class Expr:
                 else:
                     count = step
                 step = (right - left) / (count - 1)
-                return (left + i*step for i in range(count))
+                return (left + i * step for i in range(count))
             elif type == 'incr':
                 if step == 'auto':
                     count = 50
                     step = (right - left) / (count - 1)
-                    return (left + i*step for i in range(count))
+                    return (left + i * step for i in range(count))
                 else:
+
                     def g():
                         x = left
                         while x <= right:
                             yield x
                             x += step
+
                     return g()
 
             raise EvalError(f"Error: unknown range type: {type}")
@@ -448,9 +467,9 @@ class Expr:
 
             N = len(var)
             if isinstance(idx, int):
-                value = var[(idx-1) % N]
+                value = var[(idx - 1) % N]
             elif isinstance(idx, list):
-                value = [var[(i-1) % N] for i in idx]
+                value = [var[(i - 1) % N] for i in idx]
             else:
                 raise EvalError('expected int or list')
 
@@ -461,7 +480,7 @@ class Expr:
             idx = self.left.right._eval(context)
             value = self.right._eval(context)
 
-            context[vname][idx-1] = value
+            context[vname][idx - 1] = value
 
             return value
 

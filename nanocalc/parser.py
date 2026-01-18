@@ -2,7 +2,6 @@ from .common import ParseError, trace
 from .lexer import Token
 from .expr import Expr
 
-
 GRAMMAR = """
 program: 'eol'*, stmnts?, 'eol'*
 stmnts: stmnt, { end+, stmnt }, end*
@@ -145,8 +144,8 @@ def parse_atom_identifier(tokens):
 
         return root, tokens
 
-
     return Expr('var', ident.value), tokens
+
 
 @trace
 def parse_atom(tokens):
@@ -190,7 +189,6 @@ def parse_atom(tokens):
         return parse_block(tokens)
 
     raise ParseError(f"unexpected token: {next.type}")
-
 
 
 @trace
@@ -293,7 +291,7 @@ def parse_comp(tokens):
     if len(exprs) < 1:
         return left, tokens
     elif len(exprs) == 1:
-        expr, = exprs
+        (expr,) = exprs
         return Expr(expr.type, left, expr.left), tokens
 
     root = Expr('lchain', left, exprs)
@@ -341,7 +339,6 @@ def parse_block(tokens):
     tokens.pop(0)
 
     return block, tokens
-
 
 
 @trace
@@ -426,5 +423,3 @@ def parse(tokens):
         raise ParseError(f"unexpected tokens: {tokens[0]}")
 
     return root
-
-
